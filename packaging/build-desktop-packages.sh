@@ -24,9 +24,9 @@ package_platform() {
   rm -f "$archive" "$archive.sha256"
   (cd "$stage_dir" && zip -qr "$archive" "WhisperBridge-v$version")
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$archive" > "$archive.sha256"
+    (cd "$dist_dir" && shasum -a 256 "$(basename "$archive")" > "$(basename "$archive").sha256")
   else
-    sha256sum "$archive" > "$archive.sha256"
+    (cd "$dist_dir" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
   fi
   echo "Built $(basename "$archive")"
 }

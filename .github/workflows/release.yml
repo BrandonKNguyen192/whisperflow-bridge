@@ -40,7 +40,7 @@ jobs:
           cd ..
           mkdir -p dist
           cp android-app/app/build/outputs/apk/release/app-release.apk "dist/WhisperBridge-Android-v$version-build$version_code.apk"
-          sha256sum "dist/WhisperBridge-Android-v$version-build$version_code.apk" > "dist/WhisperBridge-Android-v$version-build$version_code.apk.sha256"
+          (cd dist && sha256sum "WhisperBridge-Android-v$version-build$version_code.apk" > "WhisperBridge-Android-v$version-build$version_code.apk.sha256")
 
       - name: Build desktop packages
         run: ./packaging/build-desktop-packages.sh
