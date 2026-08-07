@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="@color/card_bg"
-        app:cardCornerRadius="20dp"
+        app:cardCornerRadius="24dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/border"
         app:strokeWidth="1dp">
@@ -22,26 +22,28 @@
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:padding="26dp">
+            android:padding="28dp">
 
             <ImageView
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:src="@drawable/brand_mark" />
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/brand_mark"
+                android:contentDescription="Whisper Bridge" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="16dp"
                 android:text="Whisper Bridge"
                 android:textColor="@color/text_primary"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:letterSpacing="-0.01" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:letterSpacing="0.06"
                 android:text="Received from share sheet"
                 android:textColor="@color/text_tertiary"
@@ -50,47 +52,44 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="3dp"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="18dp"
                 android:background="@drawable/gradient_accent" />
 
-            <com.google.android.material.card.MaterialCardView
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="@color/card_bg"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="0dp"
-                app:strokeColor="@color/border"
-                app:strokeWidth="1dp">
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_field_round"
+                android:padding="16dp">
 
                 <TextView
                     android:id="@+id/tvPreview"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:maxLines="6"
-                    android:padding="14dp"
-                    android:scrollbars="vertical"
+                    android:maxLines="8"
                     android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-            </com.google.android.material.card.MaterialCardView>
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="3dp" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/tvCharCount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/bg_chip"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:textStyle="bold" />
 
             <ProgressBar
                 android:id="@+id/progress"
                 style="?android:attr/progressBarStyleSmall"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="16dp"
                 android:indeterminateTint="@color/accent"
                 android:visibility="gone" />
 
@@ -98,7 +97,7 @@
                 android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
@@ -106,81 +105,93 @@
                 android:id="@+id/cbEnterAfter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:text="Press Enter after typing"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp"
                 android:buttonTint="@color/accent"
-                android:minHeight="36dp" />
+                android:minHeight="40dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSend"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
-                    android:layout_weight="1"
+                    android:layout_height="48dp"
+                    android:layout_weight="2"
                     android:text="Type"
                     android:textSize="14sp"
+                    android:textStyle="bold"
                     app:backgroundTint="@color/accent"
-                    app:cornerRadius="999dp"
+                    app:cornerRadius="16dp"
                     app:icon="@drawable/ic_send"
                     app:iconGravity="textStart"
+                    app:iconSize="18dp"
+                    app:iconPadding="6dp"
                     app:iconTint="@android:color/white"
-                    app:shapeAppearanceOverlay="@style/ShapeKomodosPill" />
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnClipboard"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="Copy"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    app:cornerRadius="999dp"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
                     app:icon="@drawable/ic_clipboard"
                     app:iconGravity="textStart"
+                    app:iconSize="16dp"
+                    app:iconPadding="4dp"
                     app:iconTint="@color/accent"
-                    app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
                     app:strokeColor="@color/border" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnEnter"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="Enter"
                     android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    app:cornerRadius="999dp"
-                    app:icon="@drawable/ic_check"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
+                    app:icon="@drawable/ic_enter"
                     app:iconGravity="textStart"
+                    app:iconSize="16dp"
+                    app:iconPadding="4dp"
                     app:iconTint="@color/accent"
-                    app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
                     app:strokeColor="@color/accent" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDismiss"
                     style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="Close"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
-                    app:cornerRadius="999dp"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
                     app:icon="@drawable/ic_close"
                     app:iconGravity="textStart"
+                    app:iconSize="16dp"
+                    app:iconPadding="4dp"
                     app:iconTint="@color/text_secondary"
-                    app:shapeAppearanceOverlay="@style/ShapeKomodosPill" />
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

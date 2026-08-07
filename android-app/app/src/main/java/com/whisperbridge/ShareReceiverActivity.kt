@@ -1,34 +1,35 @@
 package com.whisperbridge
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import com.whisperbridge.databinding.ActivityShareReceiverBinding
 import kotlinx.coroutines.launch
 
-/**
- * Receives text shared from Whisper Flow (or any app) via Android's
- * Share sheet, then forwards it to the Mac bridge server using the
- * active profile from ProfileManager.
- */
 class ShareReceiverActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityShareReceiverBinding
     private var sharedText: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeManager.apply(this)
         super.onCreate(savedInstanceState)
         binding = ActivityShareReceiverBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Extract shared text
+        applyAccentToView(binding.root)
+
         sharedText = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
             else -> ""
@@ -48,10 +49,37 @@ class ShareReceiverActivity : AppCompatActivity() {
         binding.btnDismiss.setOnClickListener { finish() }
         binding.btnEnter.setOnClickListener { forward("enter") }
 
-        // Auto-send if a host is configured
         val profile = ProfileManager.getActive(this)
         if (profile != null && profile.host.isNotEmpty()) {
             forward("type")
+        }
+    }
+
+    private fun applyAccentToView(root: View) {
+        val accent = ThemeManager.getAccentColor(this)
+        applyAccentRecursive(root, accent)
+    }
+
+    private fun applyAccentRecursive(view: View, accent: Int) {
+        if (view is MaterialButton) {
+            val isFilled = view.backgroundTintList?.defaultColor?.let { Color.alpha(it) > 200 } ?: false
+            if (isFilled) {
+                view.backgroundTintList = ColorStateList.valueOf(accent)
+                view.iconTint = ColorStateList.valueOf(Color.WHITE)
+                view.setTextColor(Color.WHITE)
+            } else {
+                val strokeColor = view.strokeColor?.defaultColor ?: 0
+                if (strokeColor != 0 && strokeColor != ContextCompat.getColor(view.context, R.color.border)) {
+                    view.strokeColor = ColorStateList.valueOf(accent)
+                    view.setTextColor(accent)
+                    view.iconTint = ColorStateList.valueOf(accent)
+                }
+            }
+        }
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                applyAccentRecursive(view.getChildAt(i), accent)
+            }
         }
     }
 
@@ -81,12 +109,12 @@ class ShareReceiverActivity : AppCompatActivity() {
             binding.progress.visibility = View.GONE
             if (result.ok) {
                 vibrate()
-                val label = if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
+                val label = if (mode == "enter") "Return key sent" else
+                    if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
                 binding.tvStatus.text = label
                 binding.tvStatus.setTextColor(
                     ContextCompat.getColor(this@ShareReceiverActivity, R.color.status_ok)
                 )
-                // Auto-close after a short delay on success
                 binding.root.postDelayed({ finish() }, 1200)
             } else {
                 binding.tvStatus.text = "${result.message}"

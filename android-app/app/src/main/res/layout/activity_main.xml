@@ -4,13 +4,16 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:scrollbarThumbVertical="@color/border">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:paddingHorizontal="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="36dp">
 
         <!-- Brand bar -->
         <LinearLayout
@@ -20,14 +23,15 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:src="@drawable/brand_mark" />
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/brand_mark"
+                android:contentDescription="Whisper Bridge" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="14dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -36,8 +40,9 @@
                     android:layout_height="wrap_content"
                     android:text="Whisper Bridge"
                     android:textColor="@color/text_primary"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="-0.01" />
 
                 <TextView
                     android:id="@+id/statusText"
@@ -53,16 +58,16 @@
                 android:id="@+id/statusDot"
                 android:layout_width="10dp"
                 android:layout_height="10dp"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="12dp"
                 android:src="@drawable/status_dot" />
 
             <ImageButton
                 android:id="@+id/btnSettings"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Settings"
-                android:padding="8dp"
+                android:padding="10dp"
                 android:src="@drawable/ic_settings" />
         </LinearLayout>
 
@@ -70,14 +75,14 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="3dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="18dp"
             android:background="@drawable/gradient_accent" />
 
         <!-- Profile switcher -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="20dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -92,9 +97,9 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="16dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
             app:strokeColor="@color/border"
             app:strokeWidth="1dp">
@@ -103,7 +108,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:padding="20dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -125,64 +130,77 @@
                     android:hint="Type or paste, or share from Whisper Flow…"
                     android:imeOptions="actionSend"
                     android:inputType="textMultiLine|textCapSentences"
-                    android:minLines="3"
-                    android:padding="14dp"
+                    android:minLines="4"
+                    android:padding="16dp"
                     android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_tertiary"
-                    android:textSize="16sp" />
+                    android:textSize="16sp"
+                    android:lineSpacingExtra="4dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="16dp"
                     android:orientation="horizontal">
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSend"
                         android:layout_width="0dp"
-                        android:layout_height="50dp"
-                        android:layout_weight="1"
+                        android:layout_height="52dp"
+                        android:layout_weight="2"
                         android:text="Type on Mac"
                         android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.02"
                         app:backgroundTint="@color/accent"
-                        app:cornerRadius="999dp"
+                        app:cornerRadius="16dp"
                         app:icon="@drawable/ic_send"
                         app:iconGravity="textStart"
+                        app:iconSize="18dp"
+                        app:iconPadding="8dp"
                         app:iconTint="@android:color/white"
-                        app:shapeAppearanceOverlay="@style/ShapeKomodosPill" />
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnEnter"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="50dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_height="52dp"
+                        android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Enter"
                         android:textColor="@color/accent"
-                        android:textSize="14sp"
-                        app:cornerRadius="999dp"
-                        app:icon="@drawable/ic_check"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.02"
+                        app:cornerRadius="16dp"
+                        app:icon="@drawable/ic_enter"
                         app:iconGravity="textStart"
+                        app:iconSize="16dp"
+                        app:iconPadding="4dp"
                         app:iconTint="@color/accent"
-                        app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
                         app:strokeColor="@color/accent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnClipboard"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="50dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_height="52dp"
+                        android:layout_marginStart="10dp"
                         android:layout_weight="1"
-                        android:text="Clipboard"
+                        android:text="Copy"
                         android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        app:cornerRadius="999dp"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.02"
+                        app:cornerRadius="16dp"
                         app:icon="@drawable/ic_clipboard"
                         app:iconGravity="textStart"
+                        app:iconSize="16dp"
+                        app:iconPadding="4dp"
                         app:iconTint="@color/accent"
-                        app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
                         app:strokeColor="@color/border" />
                 </LinearLayout>
 
@@ -190,12 +208,12 @@
                     android:id="@+id/cbEnterAfter"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="12dp"
                     android:text="Press Enter after typing"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp"
                     android:buttonTint="@color/accent"
-                    android:minHeight="36dp" />
+                    android:minHeight="40dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -203,25 +221,25 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="18dp"
             android:background="@drawable/bg_soft_round"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="14dp">
+            android:padding="16dp">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
                 android:src="@drawable/ic_link"
-                app:tint="@color/accent" />
+                android:contentDescription="Tip" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
-                android:lineSpacingExtra="3dp"
-                android:text="Tip: in Whisper Flow, transcribe your text → tap Share → Whisper Bridge."
+                android:lineSpacingExtra="4dp"
+                android:text="In Whisper Flow, transcribe your text → tap Share → Whisper Bridge."
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
         </LinearLayout>

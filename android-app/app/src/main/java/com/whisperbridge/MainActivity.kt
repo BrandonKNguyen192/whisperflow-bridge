@@ -3,19 +3,23 @@ package com.whisperbridge
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.text.InputType
+import android.view.Gravity
 import android.view.View
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.Toast
+import android.view.ViewGroup
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.whisperbridge.databinding.ActivityMainBinding
@@ -27,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private val scanReq = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeManager.apply(this)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -34,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         ProfileManager.migrateIfNeeded(this)
         refreshProfileChips()
         updateStatusView()
+        applyAccentToView(binding.root)
 
         binding.btnSettings.setOnClickListener { showSettingsDialog() }
         binding.btnSend.setOnClickListener { sendText("type") }
@@ -48,6 +54,43 @@ class MainActivity : AppCompatActivity() {
         handlePairIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyAccentToView(binding.root)
+    }
+
+    // ── Accent application ───────────────────────────────────────
+
+    private fun applyAccentToView(root: View) {
+        val accent = ThemeManager.getAccentColor(this)
+        applyAccentRecursive(root, accent)
+    }
+
+    private fun applyAccentRecursive(view: View, accent: Int) {
+        if (view is MaterialButton) {
+            val isFilled = view.backgroundTintList?.defaultColor?.let { Color.alpha(it) > 200 } ?: false
+            if (isFilled) {
+                view.backgroundTintList = ColorStateList.valueOf(accent)
+                view.iconTint = ColorStateList.valueOf(Color.WHITE)
+                view.setTextColor(Color.WHITE)
+            } else {
+                val strokeColor = view.strokeColor?.defaultColor ?: 0
+                if (strokeColor != 0 && strokeColor != ContextCompat.getColor(view.context, R.color.border)) {
+                    // This is an outlined accent button (like Enter)
+                    view.strokeColor = ColorStateList.valueOf(accent)
+                    view.setTextColor(accent)
+                    view.iconTint = ColorStateList.valueOf(accent)
+                }
+            }
+        }
+
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                applyAccentRecursive(view.getChildAt(i), accent)
+            }
+        }
+    }
+
     // ── Profile chips ────────────────────────────────────────────
 
     private fun refreshProfileChips() {
@@ -55,6 +98,8 @@ class MainActivity : AppCompatActivity() {
         row.removeAllViews()
         val profiles = ProfileManager.getAll(this)
         val activeIdx = ProfileManager.getActiveIndex(this)
+        val accent = ThemeManager.getAccentColor(this)
+        val accentSoft = ThemeManager.getAccentSoft(this)
 
         profiles.forEachIndexed { i, p ->
             val chip = MaterialButton(this).apply {
@@ -73,8 +118,8 @@ class MainActivity : AppCompatActivity() {
                 strokeWidth = 1
                 strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
                 if (i == activeIdx) {
-                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.green_soft))
-                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.green_text))
+                    setBackgroundColor(accentSoft)
+                    setTextColor(accent)
                 } else {
                     setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
                     setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
@@ -102,7 +147,7 @@ class MainActivity : AppCompatActivity() {
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+            setTextColor(accent)
             setOnClickListener { promptAddProfile() }
         }
         row.addView(addChip)
@@ -158,10 +203,31 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSettingsDialog() {
         val profile = ProfileManager.getActive(this)
+        val accent = ThemeManager.getAccentColor(this)
+        val currentMode = ThemeManager.getThemeMode(this)
+        val currentAccentHex = ThemeManager.getAccentHex(this)
+
+        val scrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                600 * resources.displayMetrics.density.toInt()
+            )
+        }
+
         val dialogView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 32, 48, 16)
+            setPadding(48, 24, 48, 16)
         }
+
+        // ── Connection section ───────────────────────────────────
+        val connLabel = TextView(this).apply {
+            text = "CONNECTION"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_tertiary))
+            letterSpacing = 0.08f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        dialogView.addView(connLabel)
 
         val etHost = EditText(this).apply {
             hint = "Mac IP address"
@@ -170,6 +236,10 @@ class MainActivity : AppCompatActivity() {
             setPadding(32, 28, 32, 28)
             textSize = 15f
             setBackgroundResource(R.drawable.bg_field_round)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 12 }
         }
         dialogView.addView(etHost)
 
@@ -183,7 +253,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 16 }
+            ).apply { topMargin = 12 }
         }
         dialogView.addView(etPort)
 
@@ -197,16 +267,17 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 16 }
+            ).apply { topMargin = 12 }
         }
         dialogView.addView(etToken)
 
-        val buttonRow = LinearLayout(this).apply {
+        // Connection action buttons
+        val connButtonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 20 }
+            ).apply { topMargin = 16 }
         }
 
         val btnScan = MaterialButton(this).apply {
@@ -216,18 +287,18 @@ class MainActivity : AppCompatActivity() {
             setPadding(24, 0, 24, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                80
+                72
             ).apply { marginEnd = 12 }
             cornerRadius = 9999
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+            setTextColor(accent)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_qr)
             iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-            iconTint = ContextCompat.getColorStateList(this@MainActivity, R.color.accent)
+            iconTint = ColorStateList.valueOf(accent)
         }
-        buttonRow.addView(btnScan)
+        connButtonRow.addView(btnScan)
 
         val btnTest = MaterialButton(this).apply {
             text = "Test"
@@ -236,22 +307,192 @@ class MainActivity : AppCompatActivity() {
             setPadding(24, 0, 24, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                80
+                72
             )
             cornerRadius = 9999
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+            setTextColor(accent)
         }
-        buttonRow.addView(btnTest)
+        connButtonRow.addView(btnTest)
 
-        dialogView.addView(buttonRow)
+        dialogView.addView(connButtonRow)
+
+        // Divider
+        val divider = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1
+            ).apply {
+                topMargin = 24
+                bottomMargin = 8
+            }
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.border))
+        }
+        dialogView.addView(divider)
+
+        // ── Appearance section ───────────────────────────────────
+        val appearLabel = TextView(this).apply {
+            text = "APPEARANCE"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_tertiary))
+            letterSpacing = 0.08f
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 16 }
+        }
+        dialogView.addView(appearLabel)
+
+        // Theme mode selector
+        val themeLabel = TextView(this).apply {
+            text = "Theme"
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 14 }
+        }
+        dialogView.addView(themeLabel)
+
+        val themeModes = listOf(
+            Triple("Light", ThemeManager.ThemeMode.LIGHT, "☀️"),
+            Triple("Dark OLED", ThemeManager.ThemeMode.DARK_OLED, "🌑"),
+            Triple("System", ThemeManager.ThemeMode.SYSTEM, "⚙️")
+        )
+
+        val themeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 8 }
+        }
+
+        lateinit var selectedThemeMode: ThemeManager.ThemeMode
+        selectedThemeMode = currentMode
+
+        themeModes.forEach { (label, mode, _) ->
+            val chip = MaterialButton(this).apply {
+                text = label
+                textSize = 12f
+                isAllCaps = false
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(18, 0, 18, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    64
+                ).apply { marginEnd = 8 }
+                cornerRadius = 9999
+                strokeWidth = 1
+                strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+                if (mode == currentMode) {
+                    setBackgroundColor(ThemeManager.getAccentSoft(this@MainActivity))
+                    setTextColor(accent)
+                } else {
+                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                }
+                setOnClickListener {
+                    selectedThemeMode = mode
+                    // Update chip visuals
+                    for (j in 0 until themeRow.childCount) {
+                        val c = themeRow.getChildAt(j) as MaterialButton
+                        val m = themeModes[j].second
+                        if (m == mode) {
+                            c.setBackgroundColor(ThemeManager.getAccentSoft(this@MainActivity))
+                            c.setTextColor(accent)
+                        } else {
+                            c.setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
+                            c.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                        }
+                    }
+                }
+            }
+            themeRow.addView(chip)
+        }
+        dialogView.addView(themeRow)
+
+        // Accent color picker
+        val accentLabel = TextView(this).apply {
+            text = "Accent color"
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 18 }
+        }
+        dialogView.addView(accentLabel)
+
+        val accentGrid = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 10 }
+        }
+        lateinit var selectedAccentHex: String
+        selectedAccentHex = currentAccentHex
+
+        // Two rows of 4
+        val accentGrid2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 8 }
+        }
+
+        ThemeManager.accentOptions.forEachIndexed { i, opt ->
+            val swatch = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    44 * resources.displayMetrics.density.toInt(),
+                    44 * resources.displayMetrics.density.toInt()
+                ).apply { marginEnd = 12 }
+                val color = try { Color.parseColor(opt.hex) } catch (_: Exception) { Color.GRAY }
+                val bg = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(color)
+                }
+                background = bg
+                setOnClickListener {
+                    selectedAccentHex = opt.hex
+                    // Mark all swatches
+                    markSwatches(listOf(accentGrid, accentGrid2), selectedAccentHex)
+                }
+            }
+
+            // Checkmark overlay for selected
+            if (opt.hex == currentAccentHex) {
+                val check = TextView(this).apply {
+                    text = "✓"
+                    textSize = 18f
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                swatch.addView(check)
+            }
+
+            (if (i < 4) accentGrid else accentGrid2).addView(swatch)
+        }
+
+        dialogView.addView(accentGrid)
+        dialogView.addView(accentGrid2)
+
+        scrollView.addView(dialogView)
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Connection Settings")
-            .setView(dialogView)
+            .setTitle("Settings")
+            .setView(scrollView)
             .setPositiveButton("Save") { _, _ ->
+                // Save connection
                 val host = etHost.text.toString().trim()
                 val port = etPort.text.toString().trim().toIntOrNull() ?: 9877
                 val token = etToken.text.toString().trim()
@@ -261,8 +502,19 @@ class MainActivity : AppCompatActivity() {
                     val updated = profiles[activeIdx].copy(host = host, port = port, token = token)
                     ProfileManager.update(this, activeIdx, updated)
                 }
+
+                // Save appearance
+                val needsRecreate = selectedThemeMode != currentMode || selectedAccentHex != currentAccentHex
+                ThemeManager.setThemeMode(this, selectedThemeMode)
+                ThemeManager.setAccentHex(this, selectedAccentHex)
+
                 refreshProfileChips()
                 updateStatusView()
+
+                if (needsRecreate) {
+                    ThemeManager.apply(this)
+                    recreate()
+                }
             }
             .setNegativeButton("Cancel", null)
             .create()
@@ -292,6 +544,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun markSwatches(grids: List<ViewGroup>, selectedHex: String) {
+        val options = ThemeManager.accentOptions
+        var idx = 0
+        for (grid in grids) {
+            for (i in 0 until grid.childCount) {
+                val swatch = grid.getChildAt(i) as? FrameLayout ?: continue
+                swatch.removeAllViews()
+                val opt = options.getOrNull(idx++) ?: continue
+                if (opt.hex == selectedHex) {
+                    val check = TextView(swatch.context).apply {
+                        text = "✓"
+                        textSize = 18f
+                        setTextColor(Color.WHITE)
+                        gravity = Gravity.CENTER
+                        layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                    swatch.addView(check)
+                }
+            }
+        }
     }
 
     // ── Connection helpers ───────────────────────────────────────
