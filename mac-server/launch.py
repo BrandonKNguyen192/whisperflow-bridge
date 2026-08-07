@@ -18,6 +18,7 @@ Usage:
 
 import argparse
 import os
+import plistlib
 import signal
 import subprocess
 import sys
@@ -39,6 +40,21 @@ LOG_PATH = os.path.expanduser("~/Library/Logs/whisperbridge.log")
 
 
 # ── Login item (LaunchAgent) ────────────────────────────────────────────────
+
+def migrate_legacy_login_token() -> bool:
+    """Move a token from an older plist into the protected token file."""
+    try:
+        with open(PLIST_PATH, "rb") as fh:
+            args = plistlib.load(fh).get("ProgramArguments", [])
+        index = args.index("--token")
+        token = args[index + 1].strip()
+    except (OSError, ValueError, IndexError, AttributeError, plistlib.InvalidFileException):
+        return False
+    if not token:
+        return False
+    server.persist_token(token)
+    return True
+
 
 def build_plist(port: int, token: str | None,
                 no_sound: bool = False, sound_name: str | None = None,
@@ -169,6 +185,8 @@ def main():
                     help="Print the LaunchAgent plist to stdout (no side effects)")
     a = ap.parse_args()
 
+    if a.install_login and a.token is None and migrate_legacy_login_token():
+        print("  ✓ Migrated legacy login token to the protected token file")
     token = server.resolve_token(a.token)
     no_sound = a.no_sound or os.environ.get("WHISPERFLOW_NO_SOUND") == "1"
     sound_name = a.sound or os.environ.get("WHISPERFLOW_SOUND")
@@ -176,7 +194,7 @@ def main():
     if sound_name:
         server.SOUND_NAME = sound_name
     server.LOG_CONTENT = a.log_content
-    for h in a.allow_hosts:
+    for h in a.allow_host:
         if h:
             server.ALLOWED_HOSTS.add(h.lower())
     if a.clipboard_only:
@@ -184,16 +202,18 @@ def main():
 
     # Handle login-item commands
     if a.print_plist:
-        sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.no_overlay, a.log_content, a.allow_hosts))
+        sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.no_overlay, a.log_content, a.allow_host))
         return
     if a.install_login:
-        install_login(a.port, token, no_sound, sound_name, a.no_overlay, a.log_content, a.allow_hosts)
+        install_login(a.port, token, no_sound, sound_name, a.no_overlay, a.log_content, a.allow_host)
         return
     if a.uninstall_login:
         uninstall_login()
         return
 
     server.AUTH_TOKEN = server.resolve_token(a.token)
+    server.configure_allowed_hosts(a.allow_host)
+    server.start_allowed_hosts_refresher()
 
     # Start HTTP server
     try:

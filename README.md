@@ -9,7 +9,7 @@ Talk into **Whisper Flow** on your Android phone → text appears on your Mac, t
    ```bash
    cd mac-server && python3 launch.py
    ```
-   On first run a token is generated and saved to `~/.config/whisperbridge/token` (mode 0600). The token is printed once so you can pair your phone.
+   On first run a token is generated and saved to `~/.config/whisperbridge/token` (mode 0600). Pair from the QR code in the Mac console, or read the token from that file.
 3. **On the phone:** Open Whisper Bridge → tap the gear ⚙️ → enter your Mac's IP + port + token → tap **Test**
 4. **Use it:** Type in the app, or share from Whisper Flow → Whisper Bridge
 
@@ -22,7 +22,7 @@ Then use your Mac's Tailscale IP (e.g. `100.x.x.x`) in the phone app. The `--ins
 ```
 ┌──────────────┐   WiFi / LAN / Tailscale   ┌──────────────┐
 │   Android     │  ──── HTTP POST ────►     │     Mac       │
-│  Whisper Flow │      text/plain           │  server.py    │
+│  Whisper Flow │   application/json        │  server.py    │
 │  → Share →    │                           │  → ⌘V paste   │
 │  Bridge App   │                           │  → clipboard  │
 └──────────────┘                            └──────────────┘
@@ -32,7 +32,7 @@ Then use your Mac's Tailscale IP (e.g. `100.x.x.x`) in the phone app. The `--ins
 
 - **Multi-profile switching** — toggle between multiple Macs (MacBook, Studio, etc.) with one-tap profile chips
 - **Theme system** — Light, Pure OLED Black (#000), and System modes. Choose any accent color from a Material picker
-- **Enter/Return button** — separate button to send Return key after typing
+- **Enter/Return button** — separate button that sends a Return keypress
 - **Enter-after-type** — optional checkbox to auto-press Enter after pasting
 - **Pair by QR** — scan a QR code from the Mac console to auto-fill connection details
 - **Four modes** — Type (⌘V paste), Clipboard (copy only), Append (add to existing clipboard), and Enter (Return key)
@@ -98,7 +98,7 @@ shasum -a 256 app-release.apk
 **First launch:** Open Whisper Bridge → tap the gear ⚙️ → enter your Mac's details:
 - **Host:** your Mac's LAN IP (e.g. `192.168.1.42`) or Tailscale IP (e.g. `100.105.11.31`)
 - **Port:** `9877` (default)
-- **Token:** the same secret you passed with `--token`
+- **Token:** the secret stored at `~/.config/whisperbridge/token`
 - Tap **Test** to verify the connection
 
 Or scan the QR code from the Mac console (`http://localhost:9877`) by tapping **Scan** in settings.
@@ -177,6 +177,7 @@ python3 mac-server/menubar.py
 - **Text doesn't appear** — macOS Accessibility permission is required. Go to System Settings → Privacy & Security → Accessibility and enable your terminal app.
 - **Firewall blocking** — macOS may block incoming connections. Allow Python in System Settings → Network → Firewall, or temporarily disable the firewall to test.
 - **Share sheet doesn't show Whisper Bridge** — Reinstall the app, or look under "More" in the share sheet.
+- **Enter shows HTTP 400** — Update the Mac server and restart its login item with `python3 launch.py --install-login`.
 
 ## Project Structure
 

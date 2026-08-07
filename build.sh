@@ -43,9 +43,10 @@ sed -i '' \
   -e "s/versionName = .*/versionName = \"1.0.$BUILD\"/" \
   "$GRADLE_FILE"
 
-# Build
+# Build from a clean output tree. Synced folders can otherwise retain duplicate
+# generated resources that make Gradle's incremental merge stall.
 echo "  -> Building..."
-(cd android-app && ./gradlew "$GRADLE_TASK" 2>&1) || {
+(cd android-app && ./gradlew clean "$GRADLE_TASK" 2>&1) || {
   echo "  X Build failed"
   exit 1
 }

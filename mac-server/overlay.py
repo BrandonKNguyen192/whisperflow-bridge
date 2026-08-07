@@ -23,6 +23,7 @@ POLL_INTERVAL = 1.0
 OVERLAY_WIDTH = 248
 OVERLAY_HEIGHT = 44
 MARGIN = 20
+TOKEN_FILE = os.path.expanduser("~/.config/whisperbridge/token")
 
 # ── Komodos palette ─────────────────────────────────────────────────────────
 
@@ -59,9 +60,14 @@ def get_screen_size():
 def poll_server():
     """Returns dict with server status, or None if unreachable."""
     try:
+        with open(TOKEN_FILE, encoding="utf-8") as fh:
+            token = fh.read().strip()
         req = urllib.request.Request(
             f"http://localhost:{SERVER_PORT}/status",
-            headers={"User-Agent": "WhisperBridge-Overlay/1.0"}
+            headers={
+                "Authorization": f"Bearer {token}",
+                "User-Agent": "WhisperBridge-Overlay/1.1",
+            },
         )
         with urllib.request.urlopen(req, timeout=1.5) as resp:
             return json.loads(resp.read())

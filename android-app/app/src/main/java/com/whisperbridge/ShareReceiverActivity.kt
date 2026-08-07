@@ -97,9 +97,10 @@ class ShareReceiverActivity : AppCompatActivity() {
         binding.progress.visibility = View.VISIBLE
 
         lifecycleScope.launch {
+            val textToSend = if (mode == "enter") "" else sharedText
             val result = BridgeClient.sendText(
-                profile.host, profile.port, sharedText, mode, "whisperflow-share", profile.token,
-                enterAfter = binding.cbEnterAfter.isChecked
+                profile.host, profile.port, textToSend, mode, "whisperflow-share", profile.token,
+                enterAfter = mode != "enter" && binding.cbEnterAfter.isChecked
             )
             binding.progress.visibility = View.GONE
             if (result.ok) {
