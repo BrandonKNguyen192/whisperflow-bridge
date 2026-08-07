@@ -38,13 +38,13 @@
                 android:textColor="@color/text_primary"
                 android:textSize="22sp"
                 android:textStyle="bold"
-                android:letterSpacing="-0.01" />
+                android:letterSpacing="0" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:letterSpacing="0.06"
+                android:letterSpacing="0"
                 android:text="Received from share sheet"
                 android:textColor="@color/text_tertiary"
                 android:textSize="12sp" />

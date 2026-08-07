@@ -37,7 +37,7 @@ check "no /tmp log"     0 "$(ls /tmp/whisperbridge.log 2>/dev/null | wc -l | tr 
 echo "Android static checks"
 A=../android-app/app/src/main
 check "no auto-forward"  1 "$(grep -c 'forward("type")' $A/java/com/whisperbridge/ShareReceiverActivity.kt)"
-check "pair confirm"     1 "$(grep -c 'setTitle("Pair with this Mac?")' $A/java/com/whisperbridge/MainActivity.kt)"
+check "pair confirm"     1 "$(grep -c 'setTitle("Pair with \$targetName?")' $A/java/com/whisperbridge/MainActivity.kt)"
 check "backup off"       1 "$(grep -c 'allowBackup="false"' $A/AndroidManifest.xml)"
 check "no fake domains"  0 "$(grep -c '<domain' $A/res/xml/network_security_config.xml)"
 

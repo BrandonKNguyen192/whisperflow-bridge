@@ -47,7 +47,7 @@ class ScanActivity : AppCompatActivity() {
     private fun startScan() {
         IntentIntegrator(this).apply {
             setOrientationLocked(false)
-            setPrompt("Scan the pairing QR shown on your Mac console")
+            setPrompt("Scan the pairing QR shown on your computer")
             setBeepEnabled(true)
             setBarcodeImageEnabled(false)
             initiateScan()
@@ -60,7 +60,7 @@ class ScanActivity : AppCompatActivity() {
         val parsed = res?.contents?.let { Pairing.parse(it) }
         if (parsed != null) {
             // Add scanned host as a new profile, or update existing one with same host
-            val name = Pairing.labelFor(parsed.host)
+            val name = Pairing.labelFor(parsed.host, parsed.name)
             val profiles = ProfileManager.getAll(this)
             val existingIdx = profiles.indexOfFirst { it.host == parsed.host }
             if (existingIdx >= 0) {

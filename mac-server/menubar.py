@@ -28,9 +28,11 @@ import urllib.parse
 import webbrowser
 from xml.sax.saxutils import escape as xml_escape
 
-# Import the zero-dependency server engine that lives next to this file.
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import server  # noqa: E402
+# Import the zero-dependency shared receiver protocol.
+MAC_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(MAC_DIR)
+sys.path.insert(0, ROOT_DIR)
+from common import bridge_server as server  # noqa: E402
 
 def status_dot(bound: bool, tail_ip) -> str:
     """Menu-bar glyph: 🟢 ready incl. Tailscale · 🟡 LAN only · 🔴 not listening."""

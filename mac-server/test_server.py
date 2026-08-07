@@ -3,11 +3,16 @@
 
 import http.client
 import json
+import os
+import sys
 import threading
 import unittest
 from unittest import mock
 
-import server
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+from common import bridge_server as server
 
 
 class BridgeProtocolTests(unittest.TestCase):

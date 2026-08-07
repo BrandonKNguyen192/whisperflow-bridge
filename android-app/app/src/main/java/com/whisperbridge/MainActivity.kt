@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.slider.Slider
 import com.whisperbridge.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
 
@@ -224,7 +225,7 @@ class MainActivity : AppCompatActivity() {
             text = "CONNECTION"
             textSize = 11f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_tertiary))
-            letterSpacing = 0.08f
+            letterSpacing = 0f
             typeface = Typeface.DEFAULT_BOLD
         }
         dialogView.addView(connLabel)
@@ -336,7 +337,7 @@ class MainActivity : AppCompatActivity() {
             text = "APPEARANCE"
             textSize = 11f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_tertiary))
-            letterSpacing = 0.08f
+            letterSpacing = 0f
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -486,6 +487,31 @@ class MainActivity : AppCompatActivity() {
         dialogView.addView(accentGrid)
         dialogView.addView(accentGrid2)
 
+        val customAccent = MaterialButton(this).apply {
+            text = "Custom color"
+            textSize = 13f
+            isAllCaps = false
+            minWidth = 0
+            cornerRadius = 12
+            strokeWidth = 1
+            strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
+            setTextColor(accent)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                88
+            ).apply { topMargin = 12 }
+            setOnClickListener {
+                showCustomAccentDialog(selectedAccentHex) { chosenHex ->
+                    selectedAccentHex = chosenHex
+                    markSwatches(listOf(accentGrid, accentGrid2), selectedAccentHex)
+                    setTextColor(Color.parseColor(chosenHex))
+                    text = "Custom $chosenHex"
+                }
+            }
+        }
+        dialogView.addView(customAccent)
+
         scrollView.addView(dialogView)
 
         val dialog = AlertDialog.Builder(this)
@@ -571,6 +597,83 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showCustomAccentDialog(initialHex: String, onChosen: (String) -> Unit) {
+        val initial = try {
+            Color.parseColor(initialHex)
+        } catch (_: IllegalArgumentException) {
+            ThemeManager.getAccentColor(this)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 0)
+        }
+        val preview = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                64
+            ).apply { bottomMargin = 16 }
+        }
+        val valueLabel = TextView(this).apply {
+            gravity = Gravity.CENTER
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+        }
+        content.addView(preview)
+        content.addView(valueLabel)
+
+        fun addChannel(label: String, value: Int): Slider {
+            content.addView(TextView(this).apply {
+                text = label
+                textSize = 13f
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = 12 }
+            })
+            return Slider(this).apply {
+                valueFrom = 0f
+                valueTo = 255f
+                stepSize = 1f
+                this.value = value.toFloat()
+                content.addView(this)
+            }
+        }
+
+        val red = addChannel("Red", Color.red(initial))
+        val green = addChannel("Green", Color.green(initial))
+        val blue = addChannel("Blue", Color.blue(initial))
+
+        fun selectedColor(): Int = Color.rgb(red.value.toInt(), green.value.toInt(), blue.value.toInt())
+        fun refreshPreview() {
+            val color = selectedColor()
+            preview.background = GradientDrawable().apply {
+                cornerRadius = 16f
+                setColor(color)
+            }
+            valueLabel.text = String.format("#%06X", 0xFFFFFF and color)
+        }
+        listOf(red, green, blue).forEach { slider ->
+            slider.addOnChangeListener { _, _, _ -> refreshPreview() }
+        }
+        refreshPreview()
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Custom accent")
+            .setView(content)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Use", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                onChosen(String.format("#%06X", 0xFFFFFF and selectedColor()))
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
     // ── Connection helpers ───────────────────────────────────────
 
     private fun activeHostPort(): Pair<String, Int>? {
@@ -592,6 +695,8 @@ class MainActivity : AppCompatActivity() {
             "${profile!!.name} · ${profile.host}"
         else
             "Not connected"
+        binding.btnSend.text = "Type"
+        binding.btnSend.contentDescription = if (configured) "Type on ${profile!!.name}" else "Type"
         val color = if (configured) R.color.status_ok else R.color.status_idle
         binding.statusDot.setColorFilter(ContextCompat.getColor(this, color))
     }
@@ -620,7 +725,8 @@ class MainActivity : AppCompatActivity() {
             if (result.ok) {
                 vibrate()
                 binding.etText.text?.clear()
-                val label = if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
+                val target = ProfileManager.getActive(this@MainActivity)?.name ?: "computer"
+                val label = if (mode == "clipboard") "Copied to $target clipboard" else "Typed on $target"
                 Toast.makeText(this@MainActivity, label, Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this@MainActivity, "Failed: ${result.message}", Toast.LENGTH_SHORT).show()
@@ -673,8 +779,9 @@ class MainActivity : AppCompatActivity() {
         if (data.scheme != "whisperbridge") return
         val parsed = Pairing.parse(data.toString()) ?: return
 
+        val targetName = Pairing.labelFor(parsed.host, parsed.name)
         AlertDialog.Builder(this)
-            .setTitle("Pair with this Mac?")
+            .setTitle("Pair with $targetName?")
             .setMessage(
                 parsed.host + ":" + parsed.port + "\n\n" +
                 "Everything you dictate will be sent to this address. " +
@@ -684,7 +791,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Pair") { _, _ ->
                 ProfileManager.add(
                     this,
-                    ProfileManager.Profile(Pairing.labelFor(parsed.host), parsed.host, parsed.port, parsed.token)
+                    ProfileManager.Profile(targetName, parsed.host, parsed.port, parsed.token)
                 )
                 refreshProfileChips()
                 updateStatusView()

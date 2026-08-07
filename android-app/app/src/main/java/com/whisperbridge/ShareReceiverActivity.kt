@@ -81,7 +81,7 @@ class ShareReceiverActivity : AppCompatActivity() {
     private fun forward(mode: String) {
         val profile = ProfileManager.getActive(this)
         if (profile == null || profile.host.isEmpty()) {
-            binding.tvStatus.text = "No Mac configured — open the app first"
+            binding.tvStatus.text = "No computer configured — open the app first"
             binding.tvStatus.setTextColor(
                 ContextCompat.getColor(this, R.color.status_err)
             )
@@ -105,8 +105,9 @@ class ShareReceiverActivity : AppCompatActivity() {
             binding.progress.visibility = View.GONE
             if (result.ok) {
                 vibrate()
+                val target = profile.name
                 val label = if (mode == "enter") "Return key sent" else
-                    if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
+                    if (mode == "clipboard") "Copied to $target clipboard" else "Typed on $target"
                 binding.tvStatus.text = label
                 binding.tvStatus.setTextColor(
                     ContextCompat.getColor(this@ShareReceiverActivity, R.color.status_ok)
