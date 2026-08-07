@@ -1,28 +1,22 @@
 # 🎙 Whisper Flow Bridge
 
-Talk into **Whisper Flow** on your Android phone → text appears on your Mac, typed into whatever app has focus. Like a walkie-talkie for dictation.
+Talk into **Wispr Flow** on your Android phone, then send the text to the focused field on your Mac, Ubuntu, or Windows computer.
+
+> **Unofficial project:** Whisper Bridge is an independent open-source companion for Wispr Flow. It is not affiliated with, endorsed by, or sponsored by Wispr Flow, Tailscale, Microsoft, Canonical, or Apple. Wispr Flow is a trademark of its respective owner.
+
+The desktop receiver supports macOS, Ubuntu, and Windows. See [Privacy](PRIVACY.md) and [Security](SECURITY.md) before installing.
 
 ## Quick Start
 
-1. **Download the APK** from [Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases) and install on your Android phone
-2. **Start the Mac server:**
-   ```bash
-   cd mac-server && python3 launch.py
-   ```
-   On first run a token is generated and saved to `~/.config/whisperbridge/token` (mode 0600). Pair from the QR code in the Mac console, or read the token from that file.
-3. **On the phone:** Open Whisper Bridge → tap the gear ⚙️ → enter your Mac's IP + port + token → tap **Test**
-4. **Use it:** Type in the app, or share from Whisper Flow → Whisper Bridge
-
-For Tailscale remote access:
-```bash
-python3 launch.py --install-login
-```
-Then use your Mac's Tailscale IP (e.g. `100.x.x.x`) in the phone app. The `--install-login` flag makes it launch at boot and stay alive.
+1. Download the signed Android APK and your computer's ZIP from [Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases).
+2. Install the desktop receiver using `mac-server/install.command`, `ubuntu-server/install.sh`, or `windows-server/install.ps1`.
+3. Open the local console at `http://localhost:9877` and scan its pairing QR from Android settings.
+4. Share text from Wispr Flow to Whisper Bridge, choose the destination profile, and tap **Type**.
 
 ```
 ┌──────────────┐   WiFi / LAN / Tailscale   ┌──────────────┐
-│   Android     │  ──── HTTP POST ────►     │     Mac       │
-│  Whisper Flow │   application/json        │  server.py    │
+│   Android     │  ──── HTTP POST ────►     │   Computer    │
+│  Wispr Flow   │   application/json        │   receiver    │
 │  → Share →    │                           │  → ⌘V paste   │
 │  Bridge App   │                           │  → clipboard  │
 └──────────────┘                            └──────────────┘
@@ -30,38 +24,35 @@ Then use your Mac's Tailscale IP (e.g. `100.x.x.x`) in the phone app. The `--ins
 
 ## Features ✨
 
-- **Multi-profile switching** — toggle between multiple Macs (MacBook, Studio, etc.) with one-tap profile chips
-- **Theme system** — Light, Pure OLED Black (#000), and System modes. Choose any accent color from a Material picker
+- **Multi-profile switching** — toggle between Mac, Ubuntu, and Windows computers with one-tap profile chips
+- **Theme system** — Light, Pure OLED Black (#000), and System modes. Choose a preset or any RGB accent color
 - **Enter/Return button** — separate button that sends a Return keypress
 - **Enter-after-type** — optional checkbox to auto-press Enter after pasting
-- **Pair by QR** — scan a QR code from the Mac console to auto-fill connection details
-- **Four modes** — Type (⌘V paste), Clipboard (copy only), Append (add to existing clipboard), and Enter (Return key)
+- **Pair by QR** — scan a QR code from the desktop console to auto-fill connection details
+- **Four modes** — Type (paste), Clipboard (copy only), Append (add to existing clipboard), and Enter (Return key)
 - **Remote via Tailscale** — works anywhere, not just on your home WiFi. Token-based auth
 - **Login item** — `--install-login` makes it launch at boot and stay alive
-- **Share sheet integration** — share transcribed text directly from Whisper Flow to your Mac
+- **Share sheet integration** — preview and confirm text shared from Wispr Flow
 - **Floating overlay** — status pill on your Mac desktop showing live dictation feedback
 
 ## How It Works
 
-1. **Speak** into Whisper Flow on your Android phone → transcribed text appears
+1. **Speak** into Wispr Flow on your Android phone → transcribed text appears
 2. **Share** → **Whisper Bridge** (or open the app and type/paste)
-3. The bridge app sends the text over WiFi/LAN or Tailscale to the Mac server
-4. The Mac server pastes it (⌘V) into the focused text field, or copies to clipboard
+3. The bridge app sends the text over Wi-Fi/LAN or Tailscale to the selected receiver
+4. The receiver pastes it into the focused text field, or copies it to the clipboard
 
 ## Setup
 
-### 1. Mac Server
+### 1. Desktop Receiver
 
-No dependencies — just Python 3 (built into macOS).
+**macOS:** extract the Mac ZIP and double-click `mac-server/install.command`. Python 3 is required; the installer opens Accessibility settings and creates a durable LaunchAgent.
 
-```bash
-cd mac-server
-python3 launch.py
-```
+**Ubuntu:** extract the Ubuntu ZIP and run `./ubuntu-server/install.sh`. It installs the Wayland/X11 input helpers and creates a user-level systemd service.
 
-Then open **http://localhost:9877** in your browser — you'll see the console with a QR code to pair your phone.
+**Windows:** extract the Windows ZIP and run `windows-server\install.ps1` from PowerShell. Python 3 is required; allow Python through Windows Firewall only on Private networks.
 
-**First run:** macOS will ask for permission to control your computer via Accessibility. Go to **System Settings → Privacy & Security → Accessibility** and allow Terminal (or whichever app runs the script).
+Then open **http://localhost:9877** in a browser to pair the Android app.
 
 **Options:**
 ```bash
@@ -79,14 +70,7 @@ curl -X POST http://localhost:9877/send \
   -d '{"text": "Hello from the terminal!", "mode": "type"}'
 ```
 
-### 2. Find Your Mac's IP Address
-
-```bash
-ipconfig getifaddr en0
-# e.g., 192.168.1.42
-```
-
-### 3. Android App
+### 2. Android App
 
 **Download the APK** from [GitHub Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases) and install it on your phone. You'll need to allow "Install from unknown sources" in Android Settings. Verify the download with:
 ```bash
@@ -95,47 +79,47 @@ shasum -a 256 app-release.apk
 
 **To build from source:** Open the `android-app/` folder in Android Studio, sync Gradle, and Run. Requires JDK 17 and SDK 34.
 
-**First launch:** Open Whisper Bridge → tap the gear ⚙️ → enter your Mac's details:
-- **Host:** your Mac's LAN IP (e.g. `192.168.1.42`) or Tailscale IP (e.g. `100.105.11.31`)
+**First launch:** Open Whisper Bridge → tap the gear → scan the receiver QR, or enter its details:
+- **Host:** the computer's LAN or Tailscale IP
 - **Port:** `9877` (default)
 - **Token:** the secret stored at `~/.config/whisperbridge/token`
 - Tap **Test** to verify the connection
 
-Or scan the QR code from the Mac console (`http://localhost:9877`) by tapping **Scan** in settings.
+Each QR carries a destination name, so Android can switch between Mac, Ubuntu, and Windows profiles.
 
-### 4. Use It!
+### 3. Use It
 
 **From the app:**
-1. Type or paste text → tap **Type on Mac**, **Enter**, or **Clipboard**
+1. Type or paste text → tap **Type**, **Enter**, or **Clipboard**
 
 **From Whisper Flow:**
-1. Transcribe your speech in Whisper Flow
+1. Transcribe your speech in Wispr Flow
 2. Tap the **Share** button (⋮ or share icon)
 3. Choose **Whisper Bridge** from the share sheet
-4. Text is auto-sent to your Mac ✓
+4. Review the preview and tap **Type**
 
 **Manual entry:**
 1. Open the Whisper Bridge app
 2. Type or paste text
-3. Tap **Type on Mac**, **Enter**, or **Clipboard**
+3. Tap **Type**, **Enter**, or **Clipboard**
 
 ## Modes
 
 | Mode | What it does |
 |------|-------------|
-| **Type** (default) | Copies text to Mac clipboard, then simulates ⌘V to paste into the focused app |
+| **Type** (default) | Copies text to the desktop clipboard, then pastes into the focused app |
 | **Enter** | Sends a Return/Enter keypress (no text) |
-| **Clipboard** | Copies text to Mac clipboard only — you paste manually |
+| **Clipboard** | Copies text to the selected computer's clipboard only — you paste manually |
 | **Append** | Appends to existing clipboard content with a newline |
 
 ## Android App Features
 
 ### Settings (gear icon ⚙️)
 - **Connection** — Host IP, Port, Token, Scan QR, and Test button
-- **Appearance** — Theme (Light / Dark OLED / System), Accent color picker (8 colors: Sage, Sky, Rose, Amber, Violet, Teal, Ruby, Mint)
+- **Appearance** — Theme (Light / Dark OLED / System), eight curated accents, and a custom RGB color picker
 
 ### Profile switcher
-Tap the profile chips at the top to switch between multiple Macs. Long-press to delete. Each profile stores its own host, port, and token.
+Tap the profile chips at the top to switch between computers. Long-press to delete. Each profile stores its own host, port, and token.
 
 ### Theme
 - **Light** — warm off-white canvas with sage accents
@@ -144,11 +128,11 @@ Tap the profile chips at the top to switch between multiple Macs. Long-press to 
 
 ## Remote Use (Tailscale)
 
-The same server works away from home — no port forwarding, no certificates.
+The same receiver works away from home without port forwarding.
 
-1. Install **Tailscale** on the Mac and on the Android phone; sign in with the same account.
-2. On the Mac, note its tailnet address: `tailscale ip -4` (e.g. `100.64.1.23`) or its MagicDNS name (e.g. `mac-studio`).
-3. Start the server: `python3 launch.py`. A token is generated and persisted automatically — it gates `/send` and the web console without appearing in your shell history.
+1. Install **Tailscale** on the computer and Android phone; sign in with the same account.
+2. Open the local receiver console and select the Tailscale QR.
+3. Scan it from Android settings. A unique token gates `/send` and the web console.
 4. In the app, put the tailnet address in **Host** and the same secret in **Token**, then tap **Test** — it verifies the token too.
 
 Why this is safe: Tailscale's WireGuard tunnel is encrypted end‑to‑end, so plain HTTP inside it is fine.
@@ -173,9 +157,9 @@ python3 mac-server/menubar.py
 
 ## Troubleshooting
 
-- **"Connection failed"** — Make sure both devices are on the same WiFi network. Check the IP address. Make sure the Mac server is running.
+- **"Connection failed"** — Make sure both devices are on the same Wi-Fi or tailnet and the desktop receiver is running.
 - **Text doesn't appear** — macOS Accessibility permission is required. Go to System Settings → Privacy & Security → Accessibility and enable your terminal app.
-- **Firewall blocking** — macOS may block incoming connections. Allow Python in System Settings → Network → Firewall, or temporarily disable the firewall to test.
+- **Firewall blocking** — Allow Python/Whisper Bridge on trusted Private networks only.
 - **Share sheet doesn't show Whisper Bridge** — Reinstall the app, or look under "More" in the share sheet.
 - **Enter shows HTTP 400** — Update the Mac server and restart its login item with `python3 launch.py --install-login`.
 
@@ -183,12 +167,14 @@ python3 mac-server/menubar.py
 
 ```
 Whisperflow Bridge/               ← this repo
+├── common/                    # Authenticated HTTP protocol and shared runtime
 ├── mac-server/
-│   ├── server.py              # Bridge engine (zero dependencies, Python stdlib)
+│   ├── server.py              # Compatibility entry point
 │   ├── launch.py              # Convenience launcher: server + overlay + login item
 │   ├── overlay.py             # Floating status pill (tkinter)
-│   ├── menubar.py             # Menu-bar app + login item (needs `rumps`)
-│   └── qrcode.js              # Vendored QR encoder for the console (MIT)
+│   └── menubar.py             # Menu-bar app + login item (needs `rumps`)
+├── ubuntu-server/             # Wayland/X11 backend and systemd installer
+├── windows-server/            # PowerShell/SendKeys backend and startup installer
 ├── android-app/               # Android Studio project
 │   ├── app/src/main/java/com/whisperbridge/
 │   │   ├── MainActivity.kt           # Multi-profile UI + settings + theme picker

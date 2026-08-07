@@ -42,7 +42,7 @@
                     android:textColor="@color/text_primary"
                     android:textSize="22sp"
                     android:textStyle="bold"
-                    android:letterSpacing="-0.01" />
+                    android:letterSpacing="0" />
 
                 <TextView
                     android:id="@+id/statusText"
@@ -113,7 +113,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:letterSpacing="0.08"
+                    android:letterSpacing="0"
                     android:text="Compose"
                     android:textAllCaps="true"
                     android:textColor="@color/text_tertiary"
@@ -127,7 +127,7 @@
                     android:layout_marginTop="12dp"
                     android:background="@drawable/bg_field_round"
                     android:gravity="top"
-                    android:hint="Type or paste, or share from Whisper Flow…"
+                    android:hint="Type or paste, or share from Wispr Flow…"
                     android:imeOptions="actionSend"
                     android:inputType="textMultiLine|textCapSentences"
                     android:minLines="4"
@@ -155,10 +155,10 @@
                         android:minWidth="0dp"
                         android:paddingStart="10dp"
                         android:paddingEnd="10dp"
-                        android:text="Type on Mac"
+                        android:text="Type"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0.02"
+                        android:letterSpacing="0"
                         app:backgroundTint="@color/accent"
                         app:cornerRadius="16dp"
                         app:icon="@drawable/ic_send"
@@ -185,7 +185,7 @@
                         android:textColor="@color/accent"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0.02"
+                        android:letterSpacing="0"
                         app:cornerRadius="16dp"
                         app:icon="@drawable/ic_enter"
                         app:iconGravity="textStart"
@@ -212,7 +212,7 @@
                         android:textColor="@color/text_primary"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0.02"
+                        android:letterSpacing="0"
                         app:cornerRadius="16dp"
                         app:icon="@drawable/ic_clipboard"
                         app:iconGravity="textStart"
@@ -257,7 +257,7 @@
                 android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:lineSpacingExtra="4dp"
-                android:text="In Whisper Flow, transcribe your text → tap Share → Whisper Bridge."
+                android:text="In Wispr Flow, transcribe your text → tap Share → Whisper Bridge."
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
         </LinearLayout>

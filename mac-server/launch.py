@@ -26,10 +26,11 @@ import threading
 import time
 from xml.sax.saxutils import escape as xml_escape
 
-# Prepend our directory so we can import server
+# Import the shared receiver protocol from the repository root.
 MAC_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, MAC_DIR)
-import server  # noqa: E402
+ROOT_DIR = os.path.dirname(MAC_DIR)
+sys.path.insert(0, ROOT_DIR)
+from common import bridge_server as server  # noqa: E402
 
 OVERLAY_PY = os.path.join(MAC_DIR, "overlay.py")
 SYSTEM_PYTHON = "/usr/bin/python3"

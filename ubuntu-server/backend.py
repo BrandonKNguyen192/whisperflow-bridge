@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Ubuntu clipboard and focused-field input backend."""
+
+import os
+import shutil
+import subprocess
+import time
+
+
+def _has(command: str) -> bool:
+    return shutil.which(command) is not None
+
+
+def _wayland() -> bool:
+    return os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland" or bool(
+        os.environ.get("WAYLAND_DISPLAY")
+    )
+
+
+def describe() -> str:
+    if _wayland():
+        key_tool = "ydotool" if _has("ydotool") else "wtype" if _has("wtype") else "missing"
+        return f"Wayland (wl-clipboard + {key_tool})"
+    return "X11 (xclip + xdotool)"
+
+
+def ensure_ready(clipboard_only: bool = False) -> None:
+    if _wayland():
+        missing = []
+        if not _has("wl-copy") or not _has("wl-paste"):
+            missing.append("wl-clipboard")
+        if not clipboard_only and not (_has("ydotool") or _has("wtype")):
+            missing.append("ydotool")
+    else:
+        missing = []
+        if not _has("xclip"):
+            missing.append("xclip")
+        if not clipboard_only and not _has("xdotool"):
+            missing.append("xdotool")
+    if missing:
+        packages = " ".join(sorted(set(missing)))
+        raise RuntimeError(f"Missing Ubuntu input tools. Install with: sudo apt install {packages}")
+
+
+def _clipboard_write(text: str) -> None:
+    if _wayland():
+        subprocess.run(["wl-copy", "--type", "text/plain;charset=utf-8"], input=text, text=True, check=True)
+    else:
+        subprocess.run(["xclip", "-selection", "clipboard"], input=text, text=True, check=True)
+
+
+def _clipboard_read() -> str:
+    command = ["wl-paste", "--no-newline"] if _wayland() else ["xclip", "-selection", "clipboard", "-o"]
+    return subprocess.run(command, capture_output=True, text=True, check=True).stdout
+
+
+def _send_shortcut(shortcut: str) -> None:
+    if _wayland() and _has("ydotool"):
+        keys = {
+            "paste": ["29:1", "47:1", "47:0", "29:0"],
+            "enter": ["28:1", "28:0"],
+        }
+        subprocess.run(["ydotool", "key", *keys[shortcut]], check=True)
+    elif _wayland() and _has("wtype"):
+        command = ["wtype", "-M", "ctrl", "v", "-m", "ctrl"] if shortcut == "paste" else ["wtype", "-k", "Return"]
+        subprocess.run(command, check=True)
+    else:
+        key = "ctrl+v" if shortcut == "paste" else "Return"
+        subprocess.run(["xdotool", "key", "--clearmodifiers", key], check=True)
+
+
+def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
+    try:
+        if mode == "enter":
+            _send_shortcut("enter")
+            return True
+        if mode == "append":
+            existing = _clipboard_read()
+            text = f"{existing}\n{text}" if existing else text
+        _clipboard_write(text)
+        if mode == "clipboard" or mode == "append":
+            return True
+        time.sleep(0.08)
+        _send_shortcut("paste")
+        if enter_after:
+            time.sleep(0.08)
+            _send_shortcut("enter")
+        return True
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Input failed: {exc}")
+        return False
+
+
+def notify(title: str, message: str) -> None:
+    if _has("notify-send"):
+        subprocess.run(["notify-send", "--app-name=Whisper Bridge", title, message], check=False)
+
+
+def chime() -> None:
+    sound = "/usr/share/sounds/freedesktop/stereo/message.oga"
+    if _has("paplay") and os.path.exists(sound):
+        subprocess.Popen(["paplay", sound], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

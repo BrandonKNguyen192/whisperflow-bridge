@@ -13,9 +13,16 @@ object Pairing {
         return a == 100 && b in 64..127
     }
 
-    fun labelFor(host: String): String = if (isTailscale(host)) "Tailscale" else "Mac"
+    fun labelFor(host: String, suggestedName: String = ""): String {
+        val cleaned = suggestedName
+            .filter { it.isLetterOrDigit() || it == ' ' || it == '-' || it == '_' || it == '.' }
+            .trim()
+            .take(24)
+        if (cleaned.isNotEmpty()) return cleaned
+        return if (isTailscale(host)) "Tailscale" else "Mac"
+    }
 
-    data class Parsed(val host: String, val port: Int, val token: String)
+    data class Parsed(val host: String, val port: Int, val token: String, val name: String = "")
 
     fun parse(text: String): Parsed? {
         val t = text.trim()
@@ -30,6 +37,7 @@ object Pairing {
                         host,
                         u.getQueryParameter("port")?.toIntOrNull() ?: 9877,
                         u.getQueryParameter("token").orEmpty(),
+                        u.getQueryParameter("name").orEmpty(),
                     )
                 }
                 // tolerate http(s)://host:port?token=T
@@ -39,6 +47,7 @@ object Pairing {
                         host,
                         if (u.port > 0) u.port else 9877,
                         u.getQueryParameter("token").orEmpty(),
+                        u.getQueryParameter("name").orEmpty(),
                     )
                 }
                 // bare host:port

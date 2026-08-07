@@ -25,3 +25,6 @@ Thumbs.db
 
 # Logs
 /tmp/
+
+# Reproducible release output
+dist/
