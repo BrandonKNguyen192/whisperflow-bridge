@@ -11,8 +11,8 @@ android {
         applicationId = "com.whisperbridge"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.0.15"
+        versionCode = 19
+        versionName = "1.0.19"
     }
 
     signingConfigs {

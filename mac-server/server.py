@@ -24,7 +24,7 @@ import secrets
 import stat
 
 DEFAULT_PORT = 9877
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 AUTH_TOKEN = None  # set in main(); when set, /send + console require it
 
 # Live activity (read by the menu-bar app and /status)
@@ -35,6 +35,18 @@ TOKEN_FILE = os.path.join(TOKEN_DIR, "token")
 MAX_BODY = 1_000_000
 LOG_CONTENT = False
 ALLOWED_HOSTS: set[str] = set()
+
+
+def persist_token(token: str) -> None:
+    """Persist the shared secret with owner-only permissions."""
+    if not token:
+        raise ValueError("token must not be empty")
+    os.makedirs(TOKEN_DIR, exist_ok=True)
+    os.chmod(TOKEN_DIR, stat.S_IRWXU)
+    fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(token + "\n")
+    os.chmod(TOKEN_FILE, stat.S_IRUSR | stat.S_IWUSR)
 
 
 def resolve_token(cli_token: str | None) -> str:
@@ -55,15 +67,21 @@ def resolve_token(cli_token: str | None) -> str:
     except OSError:
         pass
     token = secrets.token_urlsafe(24)
-    os.makedirs(TOKEN_DIR, exist_ok=True)
-    os.chmod(TOKEN_DIR, stat.S_IRWXU)
-    fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(token + "\n")
+    persist_token(token)
     return token
 
 def get_lan_ip():
     """Best-effort LAN/egress IPv4 via a UDP connect (no packets sent)."""
+    for interface in ("en0", "en1"):
+        try:
+            out = subprocess.run(
+                ["ipconfig", "getifaddr", interface],
+                capture_output=True, text=True, timeout=1,
+            ).stdout.strip()
+            if out:
+                return out
+        except Exception:
+            pass
     for target in ("8.8.8.8", "1.1.1.1"):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -75,13 +93,6 @@ def get_lan_ip():
                 return ip
         except Exception:
             pass
-    try:
-        out = subprocess.run(["ipconfig", "getifaddr", "en0"],
-                             capture_output=True, text=True, timeout=1).stdout.strip()
-        if out:
-            return out
-    except Exception:
-        pass
     return "127.0.0.1"
 
 _tail_cache = {"ip": None, "ts": 0.0}
@@ -101,6 +112,39 @@ def get_tail_ip(force=False):
     _tail_cache["ip"] = ip
     _tail_cache["ts"] = now
     return ip
+
+
+def configure_allowed_hosts(extra_hosts: list[str] | None = None) -> None:
+    """Populate Host-header destinations accepted by every server entry point."""
+    hostname = socket.gethostname().lower()
+    local_hostname = hostname if hostname.endswith(".local") else f"{hostname}.local"
+    hosts = {
+        hostname,
+        local_hostname,
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "0.0.0.0",
+        get_lan_ip(),
+        get_tail_ip(),
+    }
+    hosts.update(extra_hosts or [])
+    ALLOWED_HOSTS.clear()
+    ALLOWED_HOSTS.update(str(host).lower() for host in hosts if host)
+
+
+def start_allowed_hosts_refresher() -> threading.Thread:
+    """Keep dynamic LAN and Tailscale addresses valid after network changes."""
+    def refresh():
+        while True:
+            time.sleep(15)
+            for host in (get_tail_ip(force=True), get_lan_ip()):
+                if host:
+                    ALLOWED_HOSTS.add(host.lower())
+
+    thread = threading.Thread(target=refresh, daemon=True)
+    thread.start()
+    return thread
 
 # Vendored QR generator (Kazuhiko Arase, MIT) — kept in its own file so the console
 # renders pairing QR codes client-side with zero Python deps and no network calls.
@@ -738,21 +782,37 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         try:
             data = json.loads(raw)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             self._json({"ok": False, "error": "invalid JSON"}, 400)
             return
 
-        text = data.get("text", "").strip()
+        if not isinstance(data, dict):
+            self._json({"ok": False, "error": "JSON body must be an object"}, 400)
+            return
+
+        raw_text = data.get("text", "")
+        if not isinstance(raw_text, str):
+            self._json({"ok": False, "error": "text must be a string"}, 400)
+            return
+        text = raw_text.strip()
 
         mode = data.get("mode", self.default_mode)
+        if not isinstance(mode, str):
+            self._json({"ok": False, "error": "mode must be a string"}, 400)
+            return
         if mode not in ("type", "clipboard", "append", "enter"):
-            mode = "type"
+            self._json({"ok": False, "error": "unsupported mode"}, 400)
+            return
 
         if mode != "enter" and not text:
             self._json({"ok": False, "error": "empty text"}, 400)
             return
 
         source = data.get("source", "unknown")
+        if not isinstance(source, str):
+            self._json({"ok": False, "error": "source must be a string"}, 400)
+            return
+        source = source[:80]
         ts = time.strftime("%H:%M:%S")
         preview = text[:80] + ("…" if len(text) > 80 else "") if text else "(enter)"
         if LOG_CONTENT:
@@ -761,6 +821,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             print(f"  ← [{ts}] ({source}/{mode}) {len(text)} chars")
 
         enter_after = data.get("enter_after", False)
+        if not isinstance(enter_after, bool):
+            self._json({"ok": False, "error": "enter_after must be a boolean"}, 400)
+            return
         ok = type_text(text, mode, enter_after=enter_after)
         if ok:
             notify("Whisper Bridge", f"Received {len(text)} chars" if text else "Return key pressed")
@@ -811,17 +874,9 @@ def main():
     if args.clipboard_only:
         BridgeHandler.default_mode = "clipboard"
 
+    configure_allowed_hosts(args.allow_host)
     lan = get_lan_ip()
     tail = get_tail_ip()
-    hostname = socket.gethostname()
-
-    ALLOWED_HOSTS.clear()
-    for h in (hostname, f"{hostname}.local", "localhost", "127.0.0.1", "::1", "0.0.0.0", lan, tail):
-        if h:
-            ALLOWED_HOSTS.add(h.lower())
-    for h in args.allow_host:
-        if h:
-            ALLOWED_HOSTS.add(h.lower())
 
     server = BridgeServer(("0.0.0.0", args.port), BridgeHandler)
 
@@ -847,18 +902,7 @@ def main():
 """)
     print("  Waiting for text from Android…\n")
 
-    def _refresh_hosts():
-        while True:
-            time.sleep(15)
-            tail = get_tail_ip(force=True)
-            if tail:
-                ALLOWED_HOSTS.add(tail.lower())
-            lan = get_lan_ip()
-            if lan:
-                ALLOWED_HOSTS.add(lan.lower())
-
-    refresh_thread = threading.Thread(target=_refresh_hosts, daemon=True)
-    refresh_thread.start()
+    start_allowed_hosts_refresher()
 
     try:
         server.serve_forever()

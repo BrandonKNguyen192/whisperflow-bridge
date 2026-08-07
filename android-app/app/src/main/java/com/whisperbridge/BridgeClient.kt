@@ -63,7 +63,15 @@ object BridgeClient {
                     Result(false, "Server error")
                 }
             } else {
-                Result(false, "HTTP $code")
+                val detail = runCatching {
+                    JSONObject(body).optString("error").trim()
+                }.getOrDefault("")
+                when {
+                    mode == "enter" && code == 400 ->
+                        Result(false, "Mac server needs an update or restart")
+                    detail.isNotEmpty() -> Result(false, "HTTP $code: $detail")
+                    else -> Result(false, "HTTP $code")
+                }
             }
         } catch (e: Exception) {
             Result(false, e.message ?: "Connection failed")

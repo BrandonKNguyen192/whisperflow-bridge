@@ -269,20 +269,22 @@ def main() -> None:
     if sound_name:
         server.SOUND_NAME = sound_name
     server.LOG_CONTENT = a.log_content
-    for h in a.allow_hosts:
+    for h in a.allow_host:
         if h:
             server.ALLOWED_HOSTS.add(h.lower())
 
     if a.print_plist:
-        sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.log_content, a.allow_hosts))
+        sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.log_content, a.allow_host))
         return
     if a.install_login:
-        install_login(a.port, token, no_sound, sound_name, a.log_content, a.allow_hosts)
+        install_login(a.port, token, no_sound, sound_name, a.log_content, a.allow_host)
         return
     if a.uninstall_login:
         uninstall_login()
         return
 
+    server.configure_allowed_hosts(a.allow_host)
+    server.start_allowed_hosts_refresher()
     httpd = start_server(a.port, token, a.clipboard_only)
     run_gui(a.port, httpd)
 

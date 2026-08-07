@@ -126,6 +126,10 @@
                     android:gravity="center"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
                     android:text="Type"
                     android:textSize="14sp"
                     android:textStyle="bold"
@@ -138,7 +142,7 @@
                     app:iconTint="@android:color/white" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnClipboard"
+                    android:id="@+id/btnEnter"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
@@ -147,6 +151,43 @@
                     android:gravity="center"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Enter"
+                    android:textColor="@color/accent"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
+                    app:icon="@drawable/ic_enter"
+                    app:iconGravity="textStart"
+                    app:iconSize="16dp"
+                    app:iconPadding="4dp"
+                    app:iconTint="@color/accent"
+                    app:strokeColor="@color/accent" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnClipboard"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     android:text="Copy"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
@@ -160,27 +201,6 @@
                     app:strokeColor="@color/border" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnEnter"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Enter"
-                    android:textColor="@color/accent"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="16dp"
-                    app:icon="@drawable/ic_enter"
-                    app:iconGravity="textStart"
-                    app:iconSize="16dp"
-                    app:iconPadding="4dp"
-                    app:iconTint="@color/accent"
-                    app:strokeColor="@color/accent" />
-
-                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDismiss"
                     style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="0dp"
@@ -190,6 +210,10 @@
                     android:gravity="center"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     android:text="Close"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp"
