@@ -91,6 +91,52 @@ def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
         return False
 
 
+def control_mouse(action: str = "move", dx: int = 0, dy: int = 0,
+                  button: str = "left", x: int | None = None,
+                  y: int | None = None) -> tuple[bool, str]:
+    """Mouse control: full support on X11 (xdotool), best-effort on Wayland."""
+    try:
+        if _wayland():
+            if action == "click":
+                b = {"left": 0, "right": 1, "middle": 2}.get(button, 0)
+                subprocess.run(["ydotool", "mouse", str(b), "1"], check=True)
+                subprocess.run(["ydotool", "mouse", str(b), "0"], check=True)
+                return True, ""
+            if action == "double_click":
+                b = {"left": 0, "right": 1, "middle": 2}.get(button, 0)
+                for _ in range(2):
+                    subprocess.run(["ydotool", "mouse", str(b), "1"], check=True)
+                    subprocess.run(["ydotool", "mouse", str(b), "0"], check=True)
+                    time.sleep(0.04)
+                return True, ""
+            return False, "move/scroll/drag need an X11 session (xdotool)"
+
+        b = {"left": 1, "middle": 2, "right": 3}[button]
+        if action == "move":
+            subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)], check=True)
+        elif action == "scroll":
+            clicks = max(1, abs(dy) // 12) if dy else 1
+            button_id = 4 if dy > 0 else 5 if dy < 0 else 7 if dx > 0 else 6
+            subprocess.run(["xdotool", "click", "--repeat", str(clicks), str(button_id)], check=True)
+        elif action in ("click", "double_click"):
+            command = ["xdotool", "click"]
+            if action == "double_click":
+                command += ["--repeat", "2"]
+            command.append(str(b))
+            subprocess.run(command, check=True)
+        elif action == "drag":
+            subprocess.run(["xdotool", "mousedown", str(b)], check=True)
+            subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)], check=True)
+            subprocess.run(["xdotool", "mouseup", str(b)], check=True)
+        elif action in ("down", "up"):
+            subprocess.run(["xdotool", "mouse" + action, str(b)], check=True)
+        else:
+            return False, f"unsupported action {action}"
+        return True, ""
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return False, str(exc)
+
+
 def notify(title: str, message: str) -> None:
     if _has("notify-send"):
         subprocess.run(["notify-send", "--app-name=Whisper Bridge", title, message], check=False)

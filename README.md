@@ -1,6 +1,8 @@
-# 🎙 Whisper Flow Bridge
+<p align="center">
+  <img src="branding/logo.png" alt="Whisper Bridge" width="460">
+</p>
 
-Talk into **Wispr Flow** on your Android phone, then send the text to the focused field on your Mac, Ubuntu, or Windows computer.
+<p align="center"><b>Talk into Wispr Flow on your Android phone, then send the text to the focused field on your Mac, Ubuntu, or Windows computer.</b></p>
 
 > **Unofficial project:** Whisper Bridge is an independent open-source companion for Wispr Flow. It is not affiliated with, endorsed by, or sponsored by Wispr Flow, Tailscale, Microsoft, Canonical, or Apple. Wispr Flow is a trademark of its respective owner.
 

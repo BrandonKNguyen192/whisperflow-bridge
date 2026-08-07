@@ -28,16 +28,16 @@ class BridgeProtocolTests(unittest.TestCase):
         self.httpd.server_close()
         self.thread.join(timeout=2)
 
-    def post(self, payload):
+    def post(self, payload, path="/send", token="test-token"):
         conn = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=2)
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         conn.request(
             "POST",
-            "/send",
+            path,
             body=json.dumps(payload),
-            headers={
-                "Authorization": "Bearer test-token",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
         )
         response = conn.getresponse()
         body = json.loads(response.read())
@@ -68,6 +68,67 @@ class BridgeProtocolTests(unittest.TestCase):
 
         self.assertEqual(400, status)
         self.assertEqual("text must be a string", body["error"])
+
+
+class ControlEndpointTests(BridgeProtocolTests):
+    @mock.patch.object(server, "mouse_control", return_value=(True, ""))
+    def test_control_moves_mouse(self, mouse_control):
+        status, body = self.post(
+            {"action": "move", "dx": 42, "dy": -17, "button": "left"},
+            path="/control",
+        )
+
+        self.assertEqual(200, status)
+        self.assertTrue(body["ok"])
+        mouse_control.assert_called_once_with("move", 42, -17, "left", None, None)
+
+    def test_control_requires_auth(self):
+        status, body = self.post(
+            {"action": "move", "dx": 1, "dy": 1},
+            path="/control",
+            token=None,
+        )
+
+        self.assertEqual(401, status)
+        self.assertEqual("unauthorized", body["error"])
+
+    def test_control_rejects_unknown_action(self):
+        status, body = self.post(
+            {"action": "teleport", "dx": 1, "dy": 1},
+            path="/control",
+        )
+
+        self.assertEqual(400, status)
+        self.assertEqual("unsupported action", body["error"])
+
+    def test_control_rejects_bad_button(self):
+        status, body = self.post(
+            {"action": "click", "button": "hover"},
+            path="/control",
+        )
+
+        self.assertEqual(400, status)
+        self.assertEqual("unsupported button", body["error"])
+
+    def test_control_rejects_non_int_deltas(self):
+        status, body = self.post(
+            {"action": "move", "dx": "fast", "dy": 1},
+            path="/control",
+        )
+
+        self.assertEqual(400, status)
+        self.assertEqual("dx and dy must be integers", body["error"])
+
+    @mock.patch.object(server, "mouse_control", return_value=(False, "Mac needs Accessibility permission"))
+    def test_control_surfaces_failure(self, mouse_control):
+        status, body = self.post(
+            {"action": "click", "button": "right"},
+            path="/control",
+        )
+
+        self.assertEqual(200, status)
+        self.assertFalse(body["ok"])
+        self.assertIn("Accessibility", body["message"])
 
 
 class AllowedHostTests(unittest.TestCase):

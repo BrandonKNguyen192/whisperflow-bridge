@@ -1,23 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Microphone body -->
+
+    <!-- bridge arc -->
     <path
-        android:fillColor="#2E7D46"
-        android:pathData="M54,30 C49.6,30 46,33.6 46,38 L46,54 C46,58.4 49.6,62 54,62 C58.4,62 62,58.4 62,54 L62,38 C62,33.6 58.4,30 54,30 Z" />
-    <!-- Mic stand arc -->
+        android:pathData="M30,36 A30,30 0 0 1 78,36"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:strokeWidth="6">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="30"
+                android:startY="36"
+                android:endX="78"
+                android:endY="36">
+                <item android:offset="0.0" android:color="#FF4C8DFF"/>
+                <item android:offset="0.5" android:color="#FF34C77B"/>
+                <item android:offset="1.0" android:color="#FFF2C14E"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- whisper sparkle -->
     <path
-        android:fillColor="#2E7D46"
-        android:pathData="M40,52 C40,59.7 46.3,66 54,66 C61.7,66 68,59.7 68,52 L64,52 C64,57.5 59.5,62 54,62 C48.5,62 44,57.5 44,52 Z" />
-    <!-- Mic stand line -->
+        android:fillColor="#FFF2C14E"
+        android:pathData="M79.6,26.38 A2,2 0 0 0 78.62,25.4 l-4.17,-1.08 a0.34,0.34 0 0 1 0,-0.65 L78.62,22.6 A1.36,1.36 0 0 0 79.6,21.62 l1.08,-4.17 a0.34,0.34 0 0 1 0.65,0 L82.4,21.62 A1.36,1.36 0 0 0 83.38,22.6 l4.17,1.08 a0.34,0.34 0 0 1 0,0.66 L83.38,25.4 a1.36,1.36 0 0 0 -0.98,0.98 l-1.08,4.17 a0.34,0.34 0 0 1 -0.65,0 z" />
+
+    <!-- mic body -->
     <path
-        android:fillColor="#2E7D46"
-        android:pathData="M52,66 L56,66 L56,74 L52,74 Z" />
-    <!-- Base -->
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M41,47 a13,13 0 0 1 13,-13 a13,13 0 0 1 13,13 v14 a13,13 0 0 1 -13,13 a13,13 0 0 1 -13,-13 z"
+        android:strokeColor="#FF173F2B"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3" />
+
+    <!-- eyes -->
     <path
-        android:fillColor="#2E7D46"
-        android:pathData="M46,74 L62,74 L62,78 L46,78 Z" />
+        android:fillColor="#FF173F2B"
+        android:pathData="M47.5,48.4 a2.6,2.6 0 1 0 0,5.2 a2.6,2.6 0 1 0 0,-5.2 z" />
+    <path
+        android:fillColor="#FF173F2B"
+        android:pathData="M60.5,48.4 a2.6,2.6 0 1 0 0,5.2 a2.6,2.6 0 1 0 0,-5.2 z" />
+
+    <!-- smile -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49.5,57.5 A5,5 0 0 0 58.5,57.5"
+        android:strokeColor="#FF173F2B"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.4" />
+
+    <!-- stem -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M51,72 h6 a1.5,1.5 0 0 1 1.5,1.5 v4 a1.5,1.5 0 0 1 -1.5,1.5 h-6 a1.5,1.5 0 0 1 -1.5,-1.5 v-4 a1.5,1.5 0 0 1 1.5,-1.5 z"
+        android:strokeColor="#FF173F2B"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.5" />
+
+    <!-- base -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M44,80 A15,15 0 0 0 64,80"
+        android:strokeColor="#FF173F2B"
+        android:strokeLineCap="round"
+        android:strokeWidth="7.5" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M44,80 A15,15 0 0 0 64,80"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="4.8" />
 </vector>

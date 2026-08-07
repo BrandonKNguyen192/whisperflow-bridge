@@ -251,6 +251,77 @@ def chime():
         pass
 
 
+# ── Mouse / trackpad control ────────────────────────────────────────────────
+
+MOUSE_HELPER_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mouse_helper.swift")
+MOUSE_CACHE_DIR = os.path.expanduser("~/.cache/whisperbridge")
+MOUSE_HELPER_BIN = os.path.join(MOUSE_CACHE_DIR, "mouse_helper")
+_mouse_compile_lock = threading.Lock()
+_mouse_compiled: bool | None = None
+
+
+def _ensure_mouse_helper() -> str | None:
+    """Compile the CGEvent mouse helper once (cached by mtime)."""
+    global _mouse_compiled
+    if _mouse_compiled is not None:
+        return MOUSE_HELPER_BIN if _mouse_compiled else None
+    with _mouse_compile_lock:
+        if _mouse_compiled is not None:
+            return MOUSE_HELPER_BIN if _mouse_compiled else None
+        try:
+            os.makedirs(MOUSE_CACHE_DIR, exist_ok=True)
+            rebuild = True
+            if os.path.exists(MOUSE_HELPER_BIN):
+                try:
+                    rebuild = os.path.getmtime(MOUSE_HELPER_BIN) < os.path.getmtime(MOUSE_HELPER_SRC)
+                except OSError:
+                    rebuild = True
+            if rebuild:
+                subprocess.run(
+                    ["xcrun", "swiftc", "-O", "-o", MOUSE_HELPER_BIN, MOUSE_HELPER_SRC],
+                    check=True, capture_output=True, text=True, timeout=120,
+                )
+            _mouse_compiled = True
+            return MOUSE_HELPER_BIN
+        except Exception as exc:
+            print(f"  ✗ Mouse helper compile failed: {exc}")
+            _mouse_compiled = False
+            return None
+
+
+def mouse_control(action: str = "move", dx: int = 0, dy: int = 0,
+                  button: str = "left", x: int | None = None,
+                  y: int | None = None) -> tuple[bool, str]:
+    """Move/click/scroll the cursor. Returns (ok, message)."""
+    if sys.platform != "darwin":
+        return False, "not supported on this platform"
+    helper = _ensure_mouse_helper()
+    if not helper:
+        return False, "mouse helper unavailable (swiftc missing)"
+    payload: dict = {"action": action, "dx": int(dx or 0), "dy": int(dy or 0), "button": button}
+    if x is not None:
+        payload["x"] = int(x)
+    if y is not None:
+        payload["y"] = int(y)
+    try:
+        proc = subprocess.run(
+            [helper, json.dumps(payload)],
+            capture_output=True, text=True, timeout=10,
+        )
+        out = (proc.stdout or "").strip()
+        try:
+            result = json.loads(out) if out else {}
+        except json.JSONDecodeError:
+            result = {}
+        if proc.returncode == 3:
+            return False, result.get("error") or "Mac needs Accessibility permission for mouse control"
+        if proc.returncode != 0 or not result.get("ok"):
+            return False, result.get("error") or f"mouse action failed ({proc.returncode})"
+        return True, ""
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"mouse action failed: {exc}"
+
+
 # ── HTTP Server ─────────────────────────────────────────────────────────────
 
 # NOTE: rendered with str.replace (not str.format) so CSS/JS braces stay literal.
@@ -258,41 +329,45 @@ STATUS_PAGE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Whisper Bridge</title>
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAzMiAzMic+PHJlY3Qgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nOCcgZmlsbD0nIzJFN0Q0NicvPjxwYXRoIGQ9J00xNiA4YTMgMyAwIDAgMC0zIDN2NWEzIDMgMCAwIDAgNiAwdi01YTMgMyAwIDAgMC0zLTN6bTUgOGE1IDUgMCAwIDEtMTAgMEg5YTcgNyAwIDAgMCA2IDYuOVYyNWgydi0yLjFBNyA3IDAgMCAwIDIzIDE2eicgZmlsbD0nI2ZmZicvPjwvc3ZnPg==">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAzMiAzMic+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSdnJyB4MT0nMCcgeTE9JzAnIHgyPScxJyB5Mj0nMCc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPSclMjM0QzhERkYnLz48c3RvcCBvZmZzZXQ9JzAuNScgc3RvcC1jb2xvcj0nJTIzMzRDNzdCJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPSclMjNGMkMxNEUnLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0nMzInIGhlaWdodD0nMzInIHJ4PSc4JyBmaWxsPSclMjMyRTdENDYnLz48cGF0aCBkPSdNOSwxMSBBNyw3IDAgMCAxIDIzLDExJyBmaWxsPSdub25lJyBzdHJva2U9J3VybCglMjNnKScgc3Ryb2tlLXdpZHRoPScyJyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTEsMTUgYTUsNSAwIDAgMSA1LC01IGE1LDUgMCAwIDEgNSw1IHY1IGE1LDUgMCAwIDEgLTUsNSBhNSw1IDAgMCAxIC01LC01IHonIGZpbGw9JyUyM2ZmZicvPjxwYXRoIGQ9J00xNSwyMyBoMiB2Mi41IGgtMiB6JyBmaWxsPSclMjNmZmYnLz48cGF0aCBkPSdNMTEuNSwyNS41IGE1LDUgMCAwIDAgNywwJyBmaWxsPSdub25lJyBzdHJva2U9JyUyM2ZmZicgc3Ryb2tlLXdpZHRoPScxLjgnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcvPjxjaXJjbGUgY3g9JzIzLjUnIGN5PSc4JyByPScxLjUnIGZpbGw9JyUyM0YyQzE0RScvPjwvc3ZnPg==">
 <style>
 :root{
- --canvas:#FBFBF9; --surface:#F6F6F3; --card:#fff; --border:#E9E8E3; --border2:#DCDBD4;
- --ink:#1C1B19; --t2:#6E6C66; --t3:#9A988F;
- --green:#2E7D46; --green-soft:#E6F0E8; --chip:#F1F0EB; --neutral:#8A887F; --err:#D14343;
+ --canvas:#F5F5F7; --glass:rgba(255,255,255,.62); --card:rgba(255,255,255,.78);
+ --border:rgba(0,0,0,.08); --border2:rgba(0,0,0,.16);
+ --ink:#1D1D1F; --t2:#6E6E73; --t3:#86868B;
+ --green:#2E7D46; --green-soft:#E9F2EC; --chip:rgba(0,0,0,.05); --neutral:#8E8E93; --err:#D14343;
  --blue:#4C8DFF; --g2:#34C77B; --amber:#F2C14E;
  --grad:linear-gradient(90deg,var(--blue),var(--g2),var(--amber));
- --r-card:16px; --r-in:12px; --r-pill:999px;
- --shadow:0 1px 2px rgba(28,27,25,.04),0 12px 32px rgba(28,27,25,.05);
+ --r-card:18px; --r-in:14px; --r-pill:999px;
+ --shadow:0 1px 1px rgba(0,0,0,.03),0 8px 24px rgba(0,0,0,.06),0 24px 60px rgba(0,0,0,.06);
+ --ease:cubic-bezier(.32,.72,.34,1);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{
- font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
- background:var(--canvas); color:var(--ink); display:flex; min-height:100vh;
- -webkit-font-smoothing:antialiased; font-size:14px; line-height:1.5;
+ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Inter",Roboto,Arial,sans-serif;
+ background:linear-gradient(180deg,#FBFBFD 0,var(--canvas) 420px); color:var(--ink); display:flex; min-height:100vh;
+ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; font-size:14px; line-height:1.5;
 }
 svg{display:block}
-.micro{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); font-weight:700}
+.micro{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); font-weight:600}
 .clamp1,.clamp2{display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
 .clamp1{-webkit-line-clamp:1} .clamp2{-webkit-line-clamp:2}
 
 /* ── sidebar ───────────────────────────────────────────── */
-.side{width:250px; flex:0 0 250px; background:var(--surface); border-right:1px solid var(--border);
- padding:16px 12px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh}
-.brand{display:flex; align-items:center; gap:10px; padding:6px 8px 16px}
-.brand b{font-size:16px; letter-spacing:-.01em}
-.btile{width:30px; height:30px; border-radius:9px; background:var(--green-soft); color:var(--green);
+.side{width:250px; flex:0 0 250px; background:var(--glass); backdrop-filter:blur(24px) saturate(180%);
+ -webkit-backdrop-filter:blur(24px) saturate(180%); border-right:1px solid var(--border);
+ padding:20px 14px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh}
+.brand{display:flex; align-items:center; gap:10px; padding:4px 8px 18px}
+.brand b{font-size:17px; letter-spacing:-.02em; font-weight:700}
+.btile{width:32px; height:32px; border-radius:10px; background:var(--green-soft); color:var(--green);
  display:flex; align-items:center; justify-content:center; flex:0 0 30px}
 .btile svg{width:16px; height:16px}
 .chev{margin-left:auto; color:var(--t3)} .chev svg{width:18px; height:18px}
 .nav{display:flex; flex-direction:column; gap:2px}
 .ni{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px;
- border-radius:var(--r-pill); color:var(--ink); text-decoration:none; cursor:pointer; user-select:none}
+ border-radius:var(--r-pill); color:var(--ink); text-decoration:none; cursor:pointer; user-select:none;
+ transition:background .18s var(--ease),color .18s var(--ease)}
 .ni:hover{background:var(--chip)}
 .ni.active{background:var(--green-soft); color:var(--green); font-weight:600}
 .ni.active:hover{background:var(--green-soft)}
@@ -310,47 +385,79 @@ svg{display:block}
 .chip.sm{padding:2px 8px; font-size:11px; margin-left:auto}
 .fsub{color:var(--t3); font-size:12px; margin-top:5px}
 
+/* ── hero ──────────────────────────────────────────────── */
+.hero{padding:14px 4px 30px}
+.hero-eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--t2);
+ background:var(--chip); border:1px solid var(--border); padding:6px 12px; border-radius:999px}
+.hero h1{font-size:clamp(34px,4.6vw,56px); line-height:1.04; letter-spacing:-.03em; font-weight:700;
+ margin:18px 0 0; color:var(--ink)}
+.grad-text{background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent}
+.hero-sub{font-size:17px; line-height:1.5; letter-spacing:-.01em; color:var(--t2); margin:12px 0 0; max-width:540px}
+.hero-meta{display:flex; align-items:center; gap:8px; margin-top:20px; flex-wrap:wrap}
+.hero-meta .chip.sm{margin-left:0}
+.pill.live{display:inline-flex; align-items:center; gap:8px; background:var(--green-soft); color:var(--green);
+ border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600}
+
 /* ── main ──────────────────────────────────────────────── */
-.main{flex:1; padding:26px 32px 60px; max-width:1120px}
-.ccard{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card);
- padding:20px 22px; box-shadow:var(--shadow)}
+.main{flex:1; width:100%; max-width:1160px; margin:0 auto; padding:36px 44px 72px}
+.ccard{background:var(--card); border:1px solid var(--border); border-top-color:rgba(255,255,255,.7);
+ border-radius:var(--r-card); padding:22px 24px; box-shadow:var(--shadow);
+ backdrop-filter:blur(20px) saturate(180%); -webkit-backdrop-filter:blur(20px) saturate(180%)}
+.ccard + .ccard{margin-top:18px}
 .cc-head{display:flex; align-items:center; justify-content:space-between; gap:12px}
-.seg{display:inline-flex; gap:4px}
+.seg{display:inline-flex; gap:2px; background:var(--chip); border:1px solid var(--border);
+ border-radius:999px; padding:3px}
 .segbtn{border:none; background:transparent; color:var(--t2); font:inherit; font-size:13px; font-weight:600;
- padding:6px 12px; border-radius:var(--r-pill); cursor:pointer}
+ padding:6px 14px; border-radius:999px; cursor:pointer;
+ transition:background .18s var(--ease),color .18s var(--ease),transform .12s var(--ease)}
 .segbtn:hover{background:var(--chip)}
-.segbtn.active{background:var(--green-soft); color:var(--green)}
-textarea{width:100%; margin-top:14px; min-height:96px; border:1px solid var(--border); border-radius:var(--r-in);
- padding:14px; font:inherit; font-size:15px; line-height:1.5; color:var(--ink); background:var(--card);
- resize:vertical; outline:none}
+.segbtn:active{transform:scale(.96)}
+.segbtn.active{background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
+textarea{width:100%; margin-top:16px; min-height:104px; border:1px solid var(--border); border-radius:var(--r-in);
+ padding:16px; font:inherit; font-size:15px; line-height:1.55; color:var(--ink); background:rgba(255,255,255,.72);
+ resize:vertical; outline:none;
+ transition:border-color .18s var(--ease),box-shadow .18s var(--ease),background .18s var(--ease)}
 textarea::placeholder{color:var(--t3)}
-textarea:focus{border-color:var(--green); box-shadow:0 0 0 3px var(--green-soft)}
+textarea:focus{border-color:rgba(46,125,70,.5); box-shadow:0 0 0 4px rgba(46,125,70,.14); background:#fff}
 .cc-foot{margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:12px}
 .hint{color:var(--t3); font-size:13px}
-.send{border:none; border-radius:var(--r-pill); padding:10px 18px; font:inherit; font-size:14px; font-weight:600;
- color:#fff; background:var(--neutral); display:inline-flex; align-items:center; gap:8px; cursor:default}
+.send{border:none; border-radius:var(--r-pill); padding:12px 20px; font:inherit; font-size:14px; font-weight:600;
+ letter-spacing:-.01em; color:#fff; background:var(--neutral); display:inline-flex; align-items:center; gap:8px;
+ cursor:default; transition:transform .12s var(--ease),filter .18s var(--ease),background .18s var(--ease)}
 .send:not(:disabled){background:var(--green); cursor:pointer}
-.send:not(:disabled):hover{filter:brightness(1.06)}
+.send:not(:disabled):hover{filter:brightness(1.07)}
+.send:not(:disabled):active{transform:scale(.97)}
 .send svg{width:15px; height:15px}
 .err{color:var(--err); font-size:12px; margin-top:8px; min-height:0}
+.btn-ghost{border:1px solid var(--border); background:var(--card); border-radius:999px; padding:8px 16px;
+ font:inherit; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer;
+ transition:transform .12s var(--ease),background .18s var(--ease)}
+.btn-ghost:hover{background:var(--chip)}
+.btn-ghost:active{transform:scale(.97)}
 
 .toolbar{margin-top:18px; display:flex; gap:12px; align-items:center}
 .searchbox{position:relative; flex:1}
 .si{position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--t3); display:flex}
 .si svg{width:16px; height:16px}
 .searchbox input{width:100%; border:1px solid var(--border); border-radius:var(--r-pill); padding:10px 16px 10px 40px;
- font:inherit; font-size:14px; background:var(--card); color:var(--ink); outline:none}
-.searchbox input:focus{border-color:var(--green); box-shadow:0 0 0 3px var(--green-soft)}
+ font:inherit; font-size:14px; background:rgba(255,255,255,.72); color:var(--ink); outline:none;
+ transition:border-color .18s var(--ease),box-shadow .18s var(--ease),background .18s var(--ease)}
+.searchbox input:focus{border-color:rgba(46,125,70,.5); box-shadow:0 0 0 4px rgba(46,125,70,.14); background:#fff}
 select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px 14px; background:var(--card);
- color:var(--ink); font:inherit; font-size:14px; cursor:pointer; outline:none}
+ color:var(--ink); font:inherit; font-size:14px; cursor:pointer; outline:none;
+ transition:border-color .18s var(--ease),box-shadow .18s var(--ease)}
+select:focus{border-color:rgba(46,125,70,.5); box-shadow:0 0 0 4px rgba(46,125,70,.14)}
 
 .grid{margin-top:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(262px,1fr)); gap:14px}
 .empty{margin-top:42px; text-align:center; color:var(--t3); font-size:14px}
 
 /* ── recent card ───────────────────────────────────────── */
 .rcard{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card); overflow:hidden;
- display:flex; flex-direction:column; transition:box-shadow .15s,border-color .15s}
-.rcard:hover{box-shadow:var(--shadow); border-color:var(--border2)}
+ display:flex; flex-direction:column; backdrop-filter:blur(16px) saturate(160%);
+ -webkit-backdrop-filter:blur(16px) saturate(160%);
+ transition:transform .22s var(--ease),box-shadow .22s var(--ease),border-color .22s var(--ease);
+ box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.rcard:hover{transform:translateY(-3px); box-shadow:var(--shadow); border-color:var(--border2)}
 .rc-top{padding:16px}
 .rc-head{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
 .rc-title{font-size:15px; font-weight:700; letter-spacing:-.01em}
@@ -378,28 +485,55 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
 
 .toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:var(--ink);
  color:#fff; padding:10px 16px; border-radius:var(--r-pill); font-size:13px; opacity:0; pointer-events:none;
- transition:opacity .2s,transform .2s; box-shadow:var(--shadow); z-index:50}
+ backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12);
+ transition:opacity .25s var(--ease),transform .25s var(--ease); box-shadow:var(--shadow); z-index:50}
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
 .toast.ok{background:var(--green)}
 
+.reveal{opacity:0; transform:translateY(14px);
+ transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.reveal.in{opacity:1; transform:none}
+
 @media (max-width:820px){
  .side{display:none}
- .main{padding:18px 16px 48px}
+ .main{padding:24px 18px 56px}
+ .hero h1{font-size:34px}
+ .cc-head{flex-direction:column; align-items:flex-start}
 }
 
 @media (prefers-color-scheme:dark){
  :root{
-  --canvas:#000; --surface:#000; --card:#0D0D0D; --border:#2A2A2A; --border2:#333;
-  --ink:#E8E8E8; --t2:#9E9E9E; --t3:#6E6E6E;
-  --green:#4ADE80; --green-soft:#0F2A1A; --chip:#1A1A1A; --neutral:#6E6E6E; --err:#EF4444;
+  --canvas:#000; --glass:rgba(0,0,0,.55); --card:rgba(28,28,30,.72);
+  --border:rgba(255,255,255,.12); --border2:rgba(255,255,255,.22);
+  --ink:#F5F5F7; --t2:#A1A1A6; --t3:#6E6E73;
+  --green:#4ADE80; --green-soft:#0F2A1A; --chip:rgba(255,255,255,.08); --neutral:#6E6E73; --err:#EF4444;
   --blue:#4C8DFF; --g2:#34C77B; --amber:#F2C14E;
   --grad:linear-gradient(90deg,var(--blue),var(--g2),var(--amber));
+  --shadow:0 1px 1px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.5),0 32px 80px rgba(0,0,0,.45);
  }
+ body{background:linear-gradient(180deg,#050505 0,var(--canvas) 420px)}
  .send:not(:disabled){background:var(--green);color:#000}
  .ni.active{color:var(--green)}
+ .segbtn.active{background:#1C1C1E; color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.5)}
+ textarea{background:rgba(255,255,255,.05)}
+ textarea:focus{background:#1C1C1E; border-color:rgba(74,222,128,.45); box-shadow:0 0 0 4px rgba(74,222,128,.16)}
+ .searchbox input{background:rgba(255,255,255,.05)}
+ .searchbox input:focus{background:#1C1C1E; border-color:rgba(74,222,128,.45); box-shadow:0 0 0 4px rgba(74,222,128,.16)}
  .rcard:hover{border-color:var(--border2)}
- .toast{background:var(--ink);color:#000}
+ .ccard{border-top-color:rgba(255,255,255,.06)}
+ .toast{background:rgba(245,245,247,.92);color:#000}
  .toast.ok{background:var(--green);color:#000}
+}
+
+@media (prefers-reduced-motion:reduce){
+ .reveal{opacity:1; transform:none; transition:none}
+ .send:not(:disabled):active,.segbtn:active,.btn-ghost:active{transform:none}
+ .rcard{transition:none}
+}
+
+@media (prefers-reduced-transparency:reduce){
+ :root{--glass:rgba(246,246,244,.98); --card:#fff}
+ .side,.ccard,.rcard,.toast{backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 
 </style></head><body>
@@ -425,7 +559,17 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
 
 <main class="main">
   @@AUTH_BANNER@@
-  <section class="ccard" id="compose">
+  <header class="hero reveal">
+    <span class="hero-eyebrow"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.4,8 A7.5,7.5 0 0 1 17.6,8"/><path d="M8.4,13.6 a3.6,3.6 0 0 1 3.6,-3.6 a3.6,3.6 0 0 1 3.6,3.6 v1.6 a3.6,3.6 0 0 1 -3.6,3.6 a3.6,3.6 0 0 1 -3.6,-3.6 z"/><path d="M9,20.6 A3.8,3.8 0 0 0 15,20.6"/></svg>Whisper Bridge</span>
+    <h1>Talk. Type. <span class="grad-text">Anywhere.</span></h1>
+    <p class="hero-sub">Voice to every Mac, Ubuntu, or Windows computer on your network. Speak in Wispr Flow, land it in the focused field.</p>
+    <div class="hero-meta">
+      <span class="pill live"><span class="dot"></span>Listening</span>
+      <span class="chip sm">:@@PORT@@</span>
+      <span class="chip sm">v@@VERSION@@</span>
+    </div>
+  </header>
+  <section class="ccard reveal" id="compose">
     <div class="cc-head">
       <span class="micro">Compose</span>
       <div class="seg" id="seg">
@@ -442,7 +586,7 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
     <div class="err" id="err"></div>
   </section>
 
-  <section class="ccard" id="pair">
+  <section class="ccard reveal" id="pair">
     <div class="cc-head">
       <span class="micro">Pair phone</span>
       <div class="seg" id="pairseg">
@@ -451,12 +595,12 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
       </div>
     </div>
     <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:12px">
-      <div id="qrbox" style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;line-height:0"></div>
+      <div id="qrbox" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px;line-height:0"></div>
       <div style="flex:1;min-width:210px">
         <div class="micro" style="margin-bottom:6px">Scan with the Whisper Bridge app</div>
         <div id="pairurl" style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--t2);word-break:break-all;background:var(--chip);border-radius:10px;padding:9px 11px"></div>
         <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
-          <button id="paircopy" style="border:1px solid var(--border);background:#fff;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer">Copy link</button>
+          <button id="paircopy" class="btn-ghost">Copy link</button>
           <span id="pairnote" style="font-size:12px;color:var(--t3)"></span>
         </div>
       </div>
@@ -468,7 +612,7 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
     <select id="sort"><option value="new">Newest</option><option value="old">Oldest</option></select>
   </div>
 
-  <div class="grid" id="grid"></div>
+  <div class="grid reveal" id="grid"></div>
   <div class="empty" id="empty">Nothing yet — send something from the box above, or share from Whisper Flow on your phone.</div>
 </main>
 
@@ -516,7 +660,7 @@ document.getElementById('paircopy').addEventListener('click', function(){
   copyText(pairPayload(net)); toast('Pairing link copied', true);
 });
 var ICONS = {
- mic:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>',
+ mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4,8 A7.5,7.5 0 0 1 17.6,8"/><path d="M8.4,13.6 a3.6,3.6 0 0 1 3.6,-3.6 a3.6,3.6 0 0 1 3.6,3.6 v1.6 a3.6,3.6 0 0 1 -3.6,3.6 a3.6,3.6 0 0 1 -3.6,-3.6 z"/><path d="M11.3,18.8 h1.4 v1.4 h-1.4 z" fill="currentColor" stroke="none"/><path d="M9,20.6 A3.8,3.8 0 0 0 15,20.6"/><path d="M19.4,5.9 a0.9,0.9 0 1 0 0,1.8 a0.9,0.9 0 1 0 0,-1.8 z" fill="currentColor" stroke="none"/></svg>',
  chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
  send:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>',
@@ -530,6 +674,15 @@ document.getElementById('btile').innerHTML = ICONS.mic;
 document.getElementById('chev').innerHTML = ICONS.chevron;
 document.getElementById('searchic').innerHTML = ICONS.search;
 document.getElementById('sendic').innerHTML = ICONS.send;
+try{
+ var rv = document.querySelectorAll('.reveal');
+ if('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  var io = new IntersectionObserver(function(es){
+   es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.08});
+  rv.forEach(function(el){ io.observe(el); });
+ } else { rv.forEach(function(el){ el.classList.add('in'); }); }
+}catch(e){}
 
 var recents = [], counts = {type:0, clipboard:0, append:0}, seq = 0, selectedMode = 'type';
 var grid = document.getElementById('grid'), empty = document.getElementById('empty');
@@ -765,7 +918,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": "bad host"}, 403)
             return
         path = urlparse(self.path).path
-        if path != "/send":
+        if path not in ("/send", "/control"):
             self._json({"ok": False, "error": "not found"}, 404)
             return
 
@@ -796,6 +949,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         if not isinstance(data, dict):
             self._json({"ok": False, "error": "JSON body must be an object"}, 400)
+            return
+
+        if path == "/control":
+            self._handle_control(data)
             return
 
         raw_text = data.get("text", "")
@@ -842,6 +999,52 @@ class BridgeHandler(BaseHTTPRequestHandler):
             STATUS["last_mode"] = mode
             STATUS["last_ts"] = ts
         self._json({"ok": ok, "chars": len(text), "mode": mode})
+
+    MOUSE_ACTIONS = ("move", "scroll", "click", "double_click", "drag", "down", "up")
+
+    def _handle_control(self, data: dict) -> None:
+        """Handle POST /control — relative mouse/trackpad actions."""
+        action = data.get("action", "")
+        if not isinstance(action, str) or action not in self.MOUSE_ACTIONS:
+            self._json({"ok": False, "error": "unsupported action"}, 400)
+            return
+
+        def _int_field(name: str, default: int = 0,
+                       lo: int = -5000, hi: int = 5000) -> int | None:
+            value = data.get(name, default)
+            if value is None:
+                value = default
+            if isinstance(value, bool) or not isinstance(value, int) or not (lo <= value <= hi):
+                return None
+            return value
+
+        dx = _int_field("dx")
+        dy = _int_field("dy")
+        if dx is None or dy is None:
+            self._json({"ok": False, "error": "dx and dy must be integers"}, 400)
+            return
+
+        button = data.get("button", "left")
+        if not isinstance(button, str) or button not in ("left", "right", "middle"):
+            self._json({"ok": False, "error": "unsupported button"}, 400)
+            return
+
+        x = y = None
+        if data.get("x") is not None or data.get("y") is not None:
+            x = _int_field("x", 0, 0, 10000)
+            y = _int_field("y", 0, 0, 10000)
+            if x is None or y is None:
+                self._json({"ok": False, "error": "x and y must be integers"}, 400)
+                return
+
+        ok, message = mouse_control(action, dx, dy, button, x, y)
+        if ok:
+            # move/scroll fire up to ~60x/sec — only log discrete actions
+            if action not in ("move", "scroll"):
+                print(f"  ← mouse {action} dx={dx} dy={dy} button={button}")
+        else:
+            print(f"  ✗ mouse {action}: {message}")
+        self._json({"ok": ok, "message": message})
 
 
 class BridgeServer(ThreadingHTTPServer):

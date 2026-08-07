@@ -7,13 +7,13 @@
     <color name="input_bg">#FF0D0D0D</color>
 
     <!-- text -->
-    <color name="text_primary">#FFE8E8E8</color>
-    <color name="text_secondary">#FF9E9E9E</color>
-    <color name="text_tertiary">#FF6E6E6E</color>
+    <color name="text_primary">#FFF5F5F7</color>
+    <color name="text_secondary">#FFA1A1A6</color>
+    <color name="text_tertiary">#FF6E6E73</color>
 
     <!-- lines -->
-    <color name="border">#FF2A2A2A</color>
-    <color name="stroke">#FF2A2A2A</color>
+    <color name="border">#FF2C2C2E</color>
+    <color name="stroke">#FF2C2C2E</color>
 
     <!-- accent (brighter green for dark) -->
     <color name="accent">#FF4ADE80</color>
@@ -21,8 +21,8 @@
     <color name="green_text">#FF4ADE80</color>
 
     <!-- chips / neutral -->
-    <color name="chip_bg">#FF1A1A1A</color>
-    <color name="neutral">#FF6E6E6E</color>
+    <color name="chip_bg">#FF1C1C1E</color>
+    <color name="neutral">#FF6E6E73</color>
     <color name="on_neutral">#FF000000</color>
 
     <!-- signature gradient stops — keep same vibrant colors -->

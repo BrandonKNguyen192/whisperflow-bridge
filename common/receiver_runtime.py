@@ -25,6 +25,10 @@ def run_receiver(
     bridge_server.type_text = backend.type_text
     bridge_server.notify = backend.notify
     bridge_server.chime = backend.chime
+    if hasattr(backend, "control_mouse"):
+        bridge_server.mouse_control = backend.control_mouse
+    else:
+        bridge_server.mouse_control = lambda *a, **k: (False, "mouse control not supported on this platform")
     bridge_server.configure_allowed_hosts(allow_hosts or [])
     bridge_server.start_allowed_hosts_refresher()
 

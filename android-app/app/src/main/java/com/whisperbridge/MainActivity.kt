@@ -7,13 +7,19 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.text.InputType
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -24,12 +30,50 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
 import com.whisperbridge.databinding.ActivityMainBinding
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val scanReq = 1001
+
+    private var dragActive = false
+    private var dragButtonDown = false
+    private var scrollActive = false
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    private var lastScrollX = 0f
+    private var lastScrollY = 0f
+    private var lastMoveTime = 0L
+    private var smoothVx = 0f
+    private var smoothVy = 0f
+    private var prevSmDx = 0f
+    private var prevSmDy = 0f
+    private var scrollVelX = 0f
+    private var scrollVelY = 0f
+    private var tapDownTime = 0L
+    private var tapDownX = 0f
+    private var tapDownY = 0f
+    private var pendingMoveDx = 0
+    private var pendingMoveDy = 0
+    private var pendingScrollX = 0
+    private var pendingScrollY = 0
+    private var trackpadPinned = false
+    private var mouseJob: Job? = null
+    private var momentumJob: Job? = null
+    private var mouseStatusJob: Job? = null
+    private var sensorManager: SensorManager? = null
+    private var gyroSensor: Sensor? = null
+    private var airMouseActive = false
+    private var lastGyroT = 0L
+    private var airVx = 0f
+    private var airVy = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeManager.apply(this)
@@ -46,6 +90,29 @@ class MainActivity : AppCompatActivity() {
         binding.btnSend.setOnClickListener { sendText("type") }
         binding.btnEnter.setOnClickListener { sendEnter() }
         binding.btnClipboard.setOnClickListener { sendText("clipboard") }
+        binding.btnMouseLeft.setOnClickListener { sendMouseButton("click", "left", "Left click") }
+        binding.btnMouseRight.setOnClickListener { sendMouseButton("click", "right", "Right click") }
+        binding.btnMouseDouble.setOnClickListener { sendMouseButton("double_click", "left", "Double click") }
+        binding.btnScrollUp.setOnClickListener { sendMouseButton("scroll", "left", "Scroll up", dy = 90) }
+        binding.btnScrollDown.setOnClickListener { sendMouseButton("scroll", "left", "Scroll down", dy = -90) }
+        binding.btnMouseDrag.setOnClickListener { toggleDragMode() }
+        binding.trackpadSurface.setOnTouchListener { _, event -> onTrackpadTouch(event) }
+        binding.btnPinTrackpad.setOnClickListener { toggleTrackpadPin() }
+        binding.btnAirMouse.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                    startAirMouse()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    stopAirMouse()
+                    true
+                }
+                else -> true
+            }
+        }
 
         binding.etText.setOnEditorActionListener { _, _, _ ->
             sendText("type")
@@ -58,6 +125,11 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         applyAccentToView(binding.root)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (airMouseActive) stopAirMouse()
     }
 
     // ── Accent application ───────────────────────────────────────
@@ -105,13 +177,16 @@ class MainActivity : AppCompatActivity() {
         profiles.forEachIndexed { i, p ->
             val chip = MaterialButton(this).apply {
                 text = p.name
-                textSize = 13f
+                textSize = 14f
                 isAllCaps = false
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(28, 0, 28, 0)
+                gravity = Gravity.CENTER
+                insetTop = 0
+                insetBottom = 0
+                setPadding(32, 0, 32, 0)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    72
+                    60
                 ).apply {
                     marginEnd = 12
                 }
@@ -136,13 +211,16 @@ class MainActivity : AppCompatActivity() {
 
         val addChip = MaterialButton(this).apply {
             text = "+"
-            textSize = 18f
+            textSize = 20f
             isAllCaps = false
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(24, 0, 24, 0)
+            gravity = Gravity.CENTER
+            insetTop = 0
+            insetBottom = 0
+            setPadding(26, 0, 26, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                72
+                60
             )
             cornerRadius = 9999
             strokeWidth = 1
@@ -171,7 +249,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("New Profile")
             .setView(input)
             .setPositiveButton("Create") { _, _ ->
-                val name = input.text.toString().trim().ifEmpty { "Mac" }
+                val name = input.text.toString().trim().ifEmpty { "MacBook Pro" }
                 ProfileManager.add(this, ProfileManager.Profile(name, "", 9877, ""))
                 refreshProfileChips()
                 updateStatusView()
@@ -288,7 +366,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(24, 0, 24, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                72
+                56
             ).apply { marginEnd = 12 }
             cornerRadius = 9999
             strokeWidth = 1
@@ -308,7 +386,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(24, 0, 24, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                72
+                56
             )
             cornerRadius = 9999
             strokeWidth = 1
@@ -359,9 +437,9 @@ class MainActivity : AppCompatActivity() {
         dialogView.addView(themeLabel)
 
         val themeModes = listOf(
-            Triple("Light", ThemeManager.ThemeMode.LIGHT, "☀️"),
-            Triple("Dark OLED", ThemeManager.ThemeMode.DARK_OLED, "🌑"),
-            Triple("System", ThemeManager.ThemeMode.SYSTEM, "⚙️")
+            Pair("Light", ThemeManager.ThemeMode.LIGHT),
+            Pair("Dark OLED", ThemeManager.ThemeMode.DARK_OLED),
+            Pair("System", ThemeManager.ThemeMode.SYSTEM)
         )
 
         val themeRow = LinearLayout(this).apply {
@@ -375,7 +453,7 @@ class MainActivity : AppCompatActivity() {
         lateinit var selectedThemeMode: ThemeManager.ThemeMode
         selectedThemeMode = currentMode
 
-        themeModes.forEach { (label, mode, _) ->
+        themeModes.forEach { (label, mode) ->
             val chip = MaterialButton(this).apply {
                 text = label
                 textSize = 12f
@@ -384,7 +462,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(18, 0, 18, 0)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    64
+                    52
                 ).apply { marginEnd = 8 }
                 cornerRadius = 9999
                 strokeWidth = 1
@@ -499,7 +577,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(accent)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                88
+                56
             ).apply { topMargin = 12 }
             setOnClickListener {
                 showCustomAccentDialog(selectedAccentHex) { chosenHex ->
@@ -511,6 +589,93 @@ class MainActivity : AppCompatActivity() {
             }
         }
         dialogView.addView(customAccent)
+
+        // ── Mouse section ─────────────────────────────────────────
+        val mouseLabel = TextView(this).apply {
+            text = "MOUSE"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_tertiary))
+            letterSpacing = 0f
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 20 }
+        }
+        dialogView.addView(mouseLabel)
+
+        val speedLabel = TextView(this).apply {
+            text = "Trackpad speed"
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 14 }
+        }
+        dialogView.addView(speedLabel)
+
+        val speedSlider = Slider(this).apply {
+            valueFrom = 1f
+            valueTo = 10f
+            stepSize = 1f
+            value = MousePrefs.getSpeed(this@MainActivity).toFloat()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 4 }
+        }
+        dialogView.addView(speedSlider)
+
+        val tapToClick = CheckBox(this).apply {
+            text = "Tap to click"
+            textSize = 13f
+            isChecked = MousePrefs.getTapToClick(this@MainActivity)
+            buttonTintList = ColorStateList.valueOf(accent)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+        }
+        dialogView.addView(tapToClick)
+
+        val naturalScroll = CheckBox(this).apply {
+            text = "Natural scrolling"
+            textSize = 13f
+            isChecked = MousePrefs.getNaturalScroll(this@MainActivity)
+            buttonTintList = ColorStateList.valueOf(accent)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+        }
+        dialogView.addView(naturalScroll)
+
+        val airSensLabel = TextView(this).apply {
+            text = "Air mouse sensitivity"
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 18 }
+        }
+        dialogView.addView(airSensLabel)
+
+        val airSensSlider = Slider(this).apply {
+            valueFrom = 1f
+            valueTo = 10f
+            stepSize = 1f
+            value = MousePrefs.getAirSens(this@MainActivity).toFloat()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 4 }
+        }
+        dialogView.addView(airSensSlider)
+
+        val airInvert = CheckBox(this).apply {
+            text = "Invert air mouse direction"
+            textSize = 13f
+            isChecked = MousePrefs.getAirInvert(this@MainActivity)
+            buttonTintList = ColorStateList.valueOf(accent)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+        }
+        dialogView.addView(airInvert)
 
         scrollView.addView(dialogView)
 
@@ -533,6 +698,11 @@ class MainActivity : AppCompatActivity() {
                 val needsRecreate = selectedThemeMode != currentMode || selectedAccentHex != currentAccentHex
                 ThemeManager.setThemeMode(this, selectedThemeMode)
                 ThemeManager.setAccentHex(this, selectedAccentHex)
+                MousePrefs.setSpeed(this, speedSlider.value.toInt())
+                MousePrefs.setTapToClick(this, tapToClick.isChecked)
+                MousePrefs.setNaturalScroll(this, naturalScroll.isChecked)
+                MousePrefs.setAirSens(this, airSensSlider.value.toInt())
+                MousePrefs.setAirInvert(this, airInvert.isChecked)
 
                 refreshProfileChips()
                 updateStatusView()
@@ -753,6 +923,361 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Mouse / trackpad ────────────────────────────────────────
+
+    private fun mouseSpeed(): Float = MousePrefs.getSpeed(this) / 4f
+
+    private fun onTrackpadTouch(event: MotionEvent): Boolean {
+        val now = SystemClock.uptimeMillis()
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                binding.trackpadSurface.parent?.requestDisallowInterceptTouchEvent(true)
+                lastTouchX = event.x
+                lastTouchY = event.y
+                tapDownTime = now
+                tapDownX = event.x
+                tapDownY = event.y
+                lastMoveTime = now
+                scrollActive = false
+                smoothVx = 0f
+                smoothVy = 0f
+                prevSmDx = 0f
+                prevSmDy = 0f
+                momentumJob?.cancel()
+                if (dragActive && !dragButtonDown) {
+                    dragButtonDown = true
+                    lifecycleScope.launch { sendControl("down", button = "left") }
+                }
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (event.pointerCount >= 2) {
+                    scrollActive = true
+                    lastScrollX = (event.getX(0) + event.getX(1)) / 2f
+                    lastScrollY = (event.getY(0) + event.getY(1)) / 2f
+                    scrollVelX = 0f
+                    scrollVelY = 0f
+                    lastMoveTime = now
+                    if (dragActive && dragButtonDown) {
+                        dragButtonDown = false
+                        lifecycleScope.launch { sendControl("up", button = "left") }
+                    }
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dt = (now - lastMoveTime).coerceIn(1L, 60L).toFloat()
+                if (scrollActive && event.pointerCount >= 2) {
+                    val cx = (event.getX(0) + event.getX(1)) / 2f
+                    val cy = (event.getY(0) + event.getY(1)) / 2f
+                    val dx = cx - lastScrollX
+                    val dy = cy - lastScrollY
+                    scrollVelX = 0.6f * (dx / dt * 1000f) + 0.4f * scrollVelX
+                    scrollVelY = 0.6f * (dy / dt * 1000f) + 0.4f * scrollVelY
+                    queueScroll(dx, dy)
+                    lastScrollX = cx
+                    lastScrollY = cy
+                } else if (event.pointerCount == 1) {
+                    val dx = event.x - lastTouchX
+                    val dy = event.y - lastTouchY
+                    smoothVx = 0.6f * (dx / dt * 1000f) + 0.4f * smoothVx
+                    smoothVy = 0.6f * (dy / dt * 1000f) + 0.4f * smoothVy
+                    queueMove(dx, dy)
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                }
+                lastMoveTime = now
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.pointerCount == 2) {
+                    val vx = scrollVelX
+                    val vy = scrollVelY
+                    scrollActive = false
+                    startScrollMomentum(vx, vy)
+                    val remaining = if (event.actionIndex == 0) 1 else 0
+                    lastTouchX = event.getX(remaining)
+                    lastTouchY = event.getY(remaining)
+                    lastMoveTime = now
+                    smoothVx = 0f
+                    smoothVy = 0f
+                    prevSmDx = 0f
+                    prevSmDy = 0f
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                binding.trackpadSurface.parent?.requestDisallowInterceptTouchEvent(false)
+                scrollActive = false
+                if (dragActive && dragButtonDown) {
+                    dragButtonDown = false
+                    lifecycleScope.launch { sendControl("up", button = "left") }
+                } else if (event.actionMasked == MotionEvent.ACTION_UP &&
+                    MousePrefs.getTapToClick(this) && !dragActive
+                ) {
+                    val moved = hypot(event.x - tapDownX, event.y - tapDownY)
+                    val quick = now - tapDownTime < 300L
+                    if (quick && moved < 12f * resources.displayMetrics.density) {
+                        lifecycleScope.launch {
+                            if (sendControl("click", button = "left")) {
+                                vibrateLight()
+                                flashMouseStatus("Tap", ok = true)
+                            }
+                        }
+                    }
+                }
+                momentumJob?.cancel()
+            }
+        }
+        return true
+    }
+
+    private fun queueMove(dx: Float, dy: Float) {
+        val speed = mouseSpeed()
+        val velocity = hypot(smoothVx, smoothVy)
+        val norm = min(1f, velocity / 850f)
+        val gain = 0.8f + 1.9f * norm * norm
+        val smDx = 0.55f * dx + 0.45f * prevSmDx
+        val smDy = 0.55f * dy + 0.45f * prevSmDy
+        prevSmDx = smDx
+        prevSmDy = smDy
+        pendingMoveDx += (smDx * speed * gain).roundToInt()
+        pendingMoveDy += (smDy * speed * gain).roundToInt()
+        ensureMouseSender()
+    }
+
+    private fun queueScroll(dx: Float, dy: Float) {
+        val speed = mouseSpeed()
+        val natural = MousePrefs.getNaturalScroll(this)
+        val factor = speed * 0.6f
+        val outX = dx * factor
+        val outY = dy * factor
+        pendingScrollX += (if (natural) -outX else outX).roundToInt()
+        pendingScrollY += (if (natural) -outY else outY).roundToInt()
+        ensureMouseSender()
+    }
+
+    private fun startScrollMomentum(vx: Float, vy: Float) {
+        if (hypot(vx, vy) < 140f) return
+        momentumJob?.cancel()
+        momentumJob = lifecycleScope.launch {
+            var mx = vx
+            var my = vy
+            val speed = mouseSpeed()
+            val natural = MousePrefs.getNaturalScroll(this@MainActivity)
+            while (hypot(mx, my) > 45f) {
+                var dx = (mx * 0.016f * speed * 0.5f).roundToInt()
+                var dy = (my * 0.016f * speed * 0.5f).roundToInt()
+                if (natural) {
+                    dx = -dx
+                    dy = -dy
+                }
+                if (dx == 0 && dy == 0) {
+                    mx *= 0.9f
+                    my *= 0.9f
+                    delay(16)
+                    continue
+                }
+                if (!sendControl("scroll", dx, dy, "left")) break
+                mx *= 0.9f
+                my *= 0.9f
+                delay(16)
+            }
+        }
+    }
+
+    private fun ensureMouseSender() {
+        if (mouseJob?.isActive == true) return
+        mouseJob = lifecycleScope.launch {
+            while (pendingMoveDx != 0 || pendingMoveDy != 0 ||
+                pendingScrollX != 0 || pendingScrollY != 0
+            ) {
+                val moveDx = pendingMoveDx
+                val moveDy = pendingMoveDy
+                val scrollX = pendingScrollX
+                val scrollY = pendingScrollY
+                pendingMoveDx = 0
+                pendingMoveDy = 0
+                pendingScrollX = 0
+                pendingScrollY = 0
+
+                if (moveDx != 0 || moveDy != 0) {
+                    val action = if (dragButtonDown) "drag" else "move"
+                    if (!sendControl(action, moveDx, moveDy, "left")) break
+                }
+                if (scrollX != 0 || scrollY != 0) {
+                    if (!sendControl("scroll", scrollX, scrollY, "left")) break
+                }
+                delay(16)
+            }
+            mouseJob = null
+        }
+    }
+
+    private fun sendMouseButton(
+        action: String,
+        button: String,
+        label: String,
+        dx: Int = 0,
+        dy: Int = 0,
+    ) {
+        if (activeHostPort() == null) return
+        lifecycleScope.launch {
+            if (sendControl(action, dx, dy, button)) {
+                flashMouseStatus(label, ok = true)
+            }
+        }
+    }
+
+    private suspend fun sendControl(
+        action: String,
+        dx: Int = 0,
+        dy: Int = 0,
+        button: String = "left",
+    ): Boolean {
+        val hp = activeHostPort() ?: return false
+        val result = BridgeClient.sendControl(
+            hp.first, hp.second, action, dx, dy, button, activeToken()
+        )
+        if (!result.ok) {
+            flashMouseStatus(result.message)
+            vibrate()
+        }
+        return result.ok
+    }
+
+    private fun toggleDragMode() {
+        dragActive = !dragActive
+        if (!dragActive && dragButtonDown) {
+            dragButtonDown = false
+            lifecycleScope.launch { sendControl("up", button = "left") }
+        }
+        updateDragButton()
+        flashMouseStatus(if (dragActive) "Drag on" else "Drag off", ok = true)
+    }
+
+    private fun toggleTrackpadPin() {
+        trackpadPinned = !trackpadPinned
+        binding.root.scrollLocked = trackpadPinned
+        val accent = ThemeManager.getAccentColor(this)
+        binding.btnPinTrackpad.setImageResource(
+            if (trackpadPinned) R.drawable.ic_lock_closed else R.drawable.ic_lock_open
+        )
+        binding.btnPinTrackpad.imageTintList = ColorStateList.valueOf(
+            if (trackpadPinned) accent
+            else ContextCompat.getColor(this, R.color.text_tertiary)
+        )
+        flashMouseStatus(
+            if (trackpadPinned) "Page scroll paused" else "Page scroll restored",
+            ok = trackpadPinned
+        )
+        vibrateLight()
+    }
+
+    // ── Air mouse (gyroscope) ───────────────────────────────────
+
+    private val gyroListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (!airMouseActive) return
+            val now = event.timestamp
+            val dtMs = if (lastGyroT != 0L) (now - lastGyroT) / 1_000_000L else 16L
+            lastGyroT = now
+
+            val wx = event.values[0]
+            val wy = event.values[1]
+            val dead = 0.04f
+            val rawX = if (abs(wx) > dead) wx else 0f
+            val rawY = if (abs(wy) > dead) wy else 0f
+
+            val invert = if (MousePrefs.getAirInvert(this@MainActivity)) -1f else 1f
+            val sens = MousePrefs.getAirSens(this@MainActivity) / 5f
+            val pxPerRad = 1100f * sens * invert
+            val targetVx = -rawY * pxPerRad
+            val targetVy = -rawX * pxPerRad
+
+            val alpha = 0.12f
+            airVx += (targetVx - airVx) * alpha
+            airVy += (targetVy - airVy) * alpha
+
+            val dtSec = (dtMs / 1000f).coerceAtMost(0.1f)
+            pendingMoveDx += (airVx * dtSec).roundToInt()
+            pendingMoveDy += (airVy * dtSec).roundToInt()
+            ensureMouseSender()
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
+    private fun startAirMouse() {
+        if (airMouseActive) return
+        val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val gyro = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+        if (gyro == null) {
+            Toast.makeText(this, "Gyroscope not available on this device", Toast.LENGTH_SHORT).show()
+            return
+        }
+        sensorManager = sm
+        gyroSensor = gyro
+        airMouseActive = true
+        lastGyroT = 0L
+        airVx = 0f
+        airVy = 0f
+        sm.registerListener(gyroListener, gyro, SensorManager.SENSOR_DELAY_GAME)
+        updateAirMouseButtonVisual(true)
+        flashMouseStatus("Air mouse on", ok = true)
+        vibrateLight()
+    }
+
+    private fun stopAirMouse() {
+        if (!airMouseActive) return
+        airMouseActive = false
+        sensorManager?.unregisterListener(gyroListener)
+        sensorManager = null
+        gyroSensor = null
+        updateAirMouseButtonVisual(false)
+        flashMouseStatus("Air mouse off", ok = true)
+    }
+
+    private fun updateAirMouseButtonVisual(active: Boolean) {
+        val btn = binding.btnAirMouse
+        val accent = ThemeManager.getAccentColor(this)
+        if (active) {
+            btn.setBackgroundColor(ThemeManager.getAccentSoft(this))
+            btn.setTextColor(accent)
+            btn.strokeColor = ColorStateList.valueOf(accent)
+        } else {
+            btn.setBackgroundColor(ContextCompat.getColor(this, R.color.card_bg))
+            btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            btn.strokeColor = ContextCompat.getColorStateList(this, R.color.border)
+        }
+    }
+
+    private fun updateDragButton() {
+        val btn = binding.btnMouseDrag
+        val accent = ThemeManager.getAccentColor(this)
+        if (dragActive) {
+            btn.setBackgroundColor(ThemeManager.getAccentSoft(this))
+            btn.setTextColor(accent)
+            btn.strokeColor = ColorStateList.valueOf(accent)
+        } else {
+            btn.setBackgroundColor(ContextCompat.getColor(this, R.color.card_bg))
+            btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            btn.strokeColor = ContextCompat.getColorStateList(this, R.color.border)
+        }
+    }
+
+    private fun flashMouseStatus(text: String, ok: Boolean = false) {
+        binding.mouseStatus.text = text
+        binding.mouseStatus.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (ok) R.color.status_ok else R.color.status_err
+            )
+        )
+        binding.mouseStatus.visibility = View.VISIBLE
+        mouseStatusJob?.cancel()
+        mouseStatusJob = lifecycleScope.launch {
+            delay(2200)
+            binding.mouseStatus.visibility = View.GONE
+        }
+    }
+
     // ── Scan / Pairing ───────────────────────────────────────────
 
     private fun launchScan() {
@@ -813,6 +1338,20 @@ class MainActivity : AppCompatActivity() {
                 @Suppress("DEPRECATION")
                 val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
                 v.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun vibrateLight() {
+        try {
+            val effect = VibrationEffect.createOneShot(12, 70)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vm.defaultVibrator.vibrate(effect)
+            } else {
+                @Suppress("DEPRECATION")
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                v.vibrate(effect)
             }
         } catch (_: Exception) {}
     }

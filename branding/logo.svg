@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640">
+  <defs>
+    <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4C8DFF"/>
+      <stop offset="0.5" stop-color="#34C77B"/>
+      <stop offset="1" stop-color="#F2C14E"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="128" y="190" width="260" height="260" rx="56" fill="#E6F0E8" stroke="#D5E3D9" stroke-width="5"/>
+  <g transform="translate(258,320) scale(2.25) translate(-54,-54)">
+    <ellipse cx="54" cy="90" rx="21" ry="4.2" fill="#1E5C38" opacity="0.14"/>
+    <path d="M30,36 A30,30 0 0 1 78,36" fill="none" stroke="url(#brandGrad)" stroke-width="6" stroke-linecap="round"/>
+    <g transform="translate(81,24) scale(0.68) translate(-12,-12)">
+      <path d="M9.937,15.5 A2,2 0 0 0 8.5,14.063 l-6.135,-1.582 a.5,.5 0 0 1 0,-.962 L8.5,9.936 A2,2 0 0 0 9.937,8.5 l1.582,-6.135 a.5,.5 0 0 1 .963,0 L14.063,8.5 A2,2 0 0 0 15.5,9.937 l6.135,1.581 a.5,.5 0 0 1 0,.964 L15.5,14.063 a2,2 0 0 0 -1.437,1.437 l-1.582,6.135 a.5,.5 0 0 1 -.963,0 z" fill="#F2C14E"/>
+    </g>
+    <path d="M41,47 a13,13 0 0 1 13,-13 a13,13 0 0 1 13,13 v14 a13,13 0 0 1 -13,13 a13,13 0 0 1 -13,-13 z" fill="#FFFFFF" stroke="#173F2B" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M47.5,48.4 a2.6,2.6 0 1 0 2.6,5.2 a2.6,2.6 0 1 0 -2.6,-5.2 z" fill="#173F2B"/>
+    <path d="M60.5,48.4 a2.6,2.6 0 1 0 2.6,5.2 a2.6,2.6 0 1 0 -2.6,-5.2 z" fill="#173F2B"/>
+    <path d="M49.5,57.5 A5,5 0 0 0 58.5,57.5" fill="none" stroke="#173F2B" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M51,72 h6 a1.5,1.5 0 0 1 1.5,1.5 v4 a1.5,1.5 0 0 1 -1.5,1.5 h-6 a1.5,1.5 0 0 1 -1.5,-1.5 v-4 a1.5,1.5 0 0 1 1.5,-1.5 z" fill="#FFFFFF" stroke="#173F2B" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M44,80 A15,15 0 0 0 64,80" fill="none" stroke="#173F2B" stroke-width="7.5" stroke-linecap="round"/>
+    <path d="M44,80 A15,15 0 0 0 64,80" fill="none" stroke="#FFFFFF" stroke-width="4.8" stroke-linecap="round"/>
+  </g>
+
+  <text x="452" y="316" font-family="'Arial Rounded MT Bold','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="110" font-weight="800" fill="#1C1B19">Whisper Bridge</text>
+  <text x="455" y="376" font-family="Helvetica,Arial,sans-serif" font-size="34" fill="#6E6C66">Talk anywhere. Type everywhere.</text>
+  <rect x="455" y="418" width="300" height="12" rx="6" fill="url(#brandGrad)"/>
+
+  <g font-family="Helvetica,Arial,sans-serif" font-size="27" font-weight="600" fill="#2E7D46">
+    <rect x="455" y="464" width="122" height="52" rx="26" fill="#E6F0E8"/>
+    <text x="516" y="497" text-anchor="middle">Android</text>
+    <rect x="593" y="464" width="104" height="52" rx="26" fill="#E6F0E8"/>
+    <text x="645" y="497" text-anchor="middle">macOS</text>
+    <rect x="713" y="464" width="114" height="52" rx="26" fill="#E6F0E8"/>
+    <text x="770" y="497" text-anchor="middle">Ubuntu</text>
+    <rect x="843" y="464" width="126" height="52" rx="26" fill="#E6F0E8"/>
+    <text x="906" y="497" text-anchor="middle">Windows</text>
+  </g>
+</svg>

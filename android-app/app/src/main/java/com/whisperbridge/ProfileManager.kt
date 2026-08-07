@@ -31,8 +31,10 @@ object ProfileManager {
             val arr = JSONArray(json)
             (0 until arr.length()).map { i ->
                 val obj = arr.getJSONObject(i)
+                var name = obj.optString("name", "MacBook Pro ${i + 1}")
+                if (name == "Mac") name = "MacBook Pro"
                 Profile(
-                    name = obj.optString("name", "Mac ${i + 1}"),
+                    name = name,
                     host = obj.optString("host", ""),
                     port = obj.optInt("port", 9877),
                     token = obj.optString("token", "")
@@ -107,7 +109,7 @@ object ProfileManager {
         val oldPort = oldPrefs.getString("port", "9877")?.toIntOrNull() ?: 9877
         val oldToken = oldPrefs.getString("token", "") ?: ""
 
-        val profile = Profile("Mac", oldHost, oldPort, oldToken)
+        val profile = Profile("MacBook Pro", oldHost, oldPort, oldToken)
         save(ctx, listOf(profile))
         setActiveIndex(ctx, 0)
     }

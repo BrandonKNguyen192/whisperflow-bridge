@@ -64,6 +64,61 @@ def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
         return False
 
 
+_MOUSE_HEADER = r'''
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class MouseNative {
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, UIntPtr dwExtraInfo);
+}
+"@
+'''
+
+
+def control_mouse(action: str = "move", dx: int = 0, dy: int = 0,
+                  button: str = "left", x: int | None = None,
+                  y: int | None = None) -> tuple[bool, str]:
+    """Mouse control via user32 mouse_event (Windows)."""
+    down = {"left": 0x0002, "right": 0x0008, "middle": 0x0020}
+    up = {"left": 0x0004, "right": 0x0010, "middle": 0x0040}
+    if action not in ("move", "scroll", "click", "double_click", "drag", "down", "up"):
+        return False, f"unsupported action {action}"
+    if button not in down:
+        return False, f"unsupported button {button}"
+
+    steps = []
+    if x is not None and y is not None:
+        steps.append(f"[MouseNative]::SetCursorPos({int(x)}, {int(y)})")
+    if action == "move":
+        steps.append(f"[MouseNative]::mouse_event(0x0001, {int(dx)}, {int(dy)}, 0, [UIntPtr]::Zero)")
+    elif action == "scroll":
+        delta = int(dy or 0) * 4
+        if delta == 0:
+            delta = 1
+        steps.append(f"[MouseNative]::mouse_event(0x0800, 0, 0, {delta}, [UIntPtr]::Zero)")
+    elif action in ("click", "double_click"):
+        count = 2 if action == "double_click" else 1
+        for _ in range(count):
+            steps.append(f"[MouseNative]::mouse_event({down[button]}, 0, 0, 0, [UIntPtr]::Zero)")
+            steps.append(f"[MouseNative]::mouse_event({up[button]}, 0, 0, 0, [UIntPtr]::Zero)")
+            if count == 2:
+                steps.append("Start-Sleep -Milliseconds 40")
+    elif action == "drag":
+        steps.append(f"[MouseNative]::mouse_event({down[button]}, 0, 0, 0, [UIntPtr]::Zero)")
+        steps.append(f"[MouseNative]::mouse_event(0x0001, {int(dx)}, {int(dy)}, 0, [UIntPtr]::Zero)")
+        steps.append(f"[MouseNative]::mouse_event({up[button]}, 0, 0, 0, [UIntPtr]::Zero)")
+    elif action in ("down", "up"):
+        flag = down[button] if action == "down" else up[button]
+        steps.append(f"[MouseNative]::mouse_event({flag}, 0, 0, 0, [UIntPtr]::Zero)")
+
+    try:
+        _powershell(_MOUSE_HEADER + "\n" + "\n".join(steps))
+        return True, ""
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return False, str(exc)
+
+
 def notify(title: str, message: str) -> None:
     del title, message
 

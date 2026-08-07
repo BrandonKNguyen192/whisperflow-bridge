@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.whisperbridge.LockableScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -40,9 +40,9 @@
                     android:layout_height="wrap_content"
                     android:text="Whisper Bridge"
                     android:textColor="@color/text_primary"
-                    android:textSize="22sp"
+                    android:textSize="24sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0" />
+                    android:letterSpacing="-0.02" />
 
                 <TextView
                     android:id="@+id/statusText"
@@ -113,12 +113,12 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:letterSpacing="0"
                     android:text="Compose"
                     android:textAllCaps="true"
                     android:textColor="@color/text_tertiary"
                     android:textSize="11sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08" />
 
                 <EditText
                     android:id="@+id/etText"
@@ -146,32 +146,31 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSend"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="2"
+                        android:layout_height="56dp"
+                        android:layout_weight="1"
                         android:gravity="center"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:maxLines="1"
                         android:minWidth="0dp"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
                         android:text="Type"
-                        android:textSize="14sp"
+                        android:textSize="12sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0"
                         app:backgroundTint="@color/accent"
-                        app:cornerRadius="16dp"
+                        app:cornerRadius="14dp"
                         app:icon="@drawable/ic_send"
-                        app:iconGravity="textStart"
-                        app:iconSize="18dp"
-                        app:iconPadding="8dp"
+                        app:iconGravity="textTop"
+                        app:iconSize="20dp"
+                        app:iconPadding="2dp"
                         app:iconTint="@android:color/white" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnEnter"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
+                        android:layout_height="56dp"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:gravity="center"
@@ -179,18 +178,17 @@
                         android:insetBottom="0dp"
                         android:maxLines="1"
                         android:minWidth="0dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
                         android:text="Enter"
                         android:textColor="@color/accent"
-                        android:textSize="13sp"
+                        android:textSize="12sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0"
-                        app:cornerRadius="16dp"
+                        app:cornerRadius="14dp"
                         app:icon="@drawable/ic_enter"
-                        app:iconGravity="textStart"
-                        app:iconSize="16dp"
-                        app:iconPadding="4dp"
+                        app:iconGravity="textTop"
+                        app:iconSize="20dp"
+                        app:iconPadding="2dp"
                         app:iconTint="@color/accent"
                         app:strokeColor="@color/accent" />
 
@@ -198,7 +196,7 @@
                         android:id="@+id/btnClipboard"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
+                        android:layout_height="56dp"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:gravity="center"
@@ -206,18 +204,17 @@
                         android:insetBottom="0dp"
                         android:maxLines="1"
                         android:minWidth="0dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
                         android:text="Copy"
                         android:textColor="@color/text_primary"
-                        android:textSize="13sp"
+                        android:textSize="12sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0"
-                        app:cornerRadius="16dp"
+                        app:cornerRadius="14dp"
                         app:icon="@drawable/ic_clipboard"
-                        app:iconGravity="textStart"
-                        app:iconSize="16dp"
-                        app:iconPadding="4dp"
+                        app:iconGravity="textTop"
+                        app:iconSize="20dp"
+                        app:iconPadding="2dp"
                         app:iconTint="@color/accent"
                         app:strokeColor="@color/border" />
                 </LinearLayout>
@@ -232,6 +229,249 @@
                     android:textSize="13sp"
                     android:buttonTint="@color/accent"
                     android:minHeight="40dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Mouse / trackpad -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/border"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Mouse"
+                        android:textAllCaps="true"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08" />
+
+                    <ImageButton
+                        android:id="@+id/btnPinTrackpad"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Pin trackpad"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_lock_open" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:id="@+id/trackpadSurface"
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_field_round">
+
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_cursor" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMouseLeft"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:text="Left"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="@color/border" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMouseRight"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:text="Right"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="@color/border" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMouseDouble"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:text="Double"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="@color/border" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMouseDrag"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:text="Drag"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="@color/border" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScrollUp"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:text="Scroll up"
+                        android:textColor="@color/text_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:icon="@drawable/ic_chevron_up"
+                        app:iconGravity="textTop"
+                        app:iconSize="16dp"
+                        app:iconPadding="0dp"
+                        app:iconTint="@color/text_primary"
+                        app:strokeColor="@color/border" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScrollDown"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:text="Scroll down"
+                        android:textColor="@color/text_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:icon="@drawable/ic_chevron_down"
+                        app:iconGravity="textTop"
+                        app:iconSize="16dp"
+                        app:iconPadding="0dp"
+                        app:iconTint="@color/text_primary"
+                        app:strokeColor="@color/border" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAirMouse"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Hold for air mouse"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="14dp"
+                    app:icon="@drawable/ic_cursor"
+                    app:iconGravity="textStart"
+                    app:iconSize="18dp"
+                    app:iconPadding="8dp"
+                    app:iconTint="@color/accent"
+                    app:strokeColor="@color/border" />
+
+                <TextView
+                    android:id="@+id/mouseStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -262,4 +502,4 @@
                 android:textSize="13sp" />
         </LinearLayout>
     </LinearLayout>
-</ScrollView>
+</com.whisperbridge.LockableScrollView>

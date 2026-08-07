@@ -19,7 +19,7 @@ object Pairing {
             .trim()
             .take(24)
         if (cleaned.isNotEmpty()) return cleaned
-        return if (isTailscale(host)) "Tailscale" else "Mac"
+        return if (isTailscale(host)) "Tailscale" else "MacBook Pro"
     }
 
     data class Parsed(val host: String, val port: Int, val token: String, val name: String = "")

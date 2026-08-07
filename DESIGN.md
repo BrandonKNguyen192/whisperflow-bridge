@@ -5,61 +5,83 @@ language (as seen in *Komodos Links*). This file is the single source of truth
 so every surface — the Mac web console, the Android app, and the workflow
 mockup — stays visually consistent.
 
+As of the v1.2 branding refresh the identity leans **Apple-inspired**: system
+typography with size-aware tracking, translucent "glass" materials on the web,
+pure-black OLED support, hairline borders, generous whitespace, and motion that
+starts on press and respects reduced-motion settings.
+
+## Brand mark
+
+The mascot is a smiling microphone under a blue → green → amber "bridge" arc
+with a whisper sparkle. It renders in three places:
+
+- **Launcher icon** — `android-app/app/src/main/res/drawable/ic_launcher_foreground.xml`
+  on the themed `icon_bg` tile.
+- **In-app mark** — `android-app/app/src/main/res/drawable/brand_mark.xml`
+  on a `green_soft` tile.
+- **Marketing kit** — editable sources plus PNG renders in `branding/`
+  (`icon.svg`, `logo.svg`, `social-preview.svg`).
+
 ## Principles
 
-1. **Warm-neutral canvas.** Surfaces are paper-like off-whites, never cold
-   grays. Page `#FBFBF9`, panels/sidebar `#F6F6F3`, cards `#FFFFFF`.
+1. **Warm-neutral canvas.** Surfaces are Apple-style neutrals. Page `#F5F5F7`,
+   panels/sidebar `#EFEFF2`, cards `#FFFFFF`; dark mode is pure black `#000`.
 2. **One accent: sage green.** Green is the affirmative/active color — primary
    buttons, links, selected pills, live status. `#2E7D46` on a pale tint
    `#E6F0E8`. Everything else stays neutral.
 3. **Soft geometry.** Generous radii (cards 16, inputs 12, pills/chips/buttons
    fully rounded). Separation comes from **hairline borders** (`#E9E8E3`), not
    heavy shadows. Shadows, when used, are whisper-soft.
-4. **Quiet typography.** A clean grotesque (Inter / system sans). Bold for
-   titles, regular for body, muted gray for secondary. Section labels are
-   **11px uppercase, letter-spaced, tertiary gray**.
+4. **Quiet typography.** System sans first (`-apple-system` / Roboto). Display
+   text carries tight negative tracking (`-0.02em` to `-0.03em`) and tight
+   leading; body sits near `0` tracking with comfortable leading. Section
+   labels are **11px uppercase, `+0.08em`, tertiary gray**.
 5. **Pill & chip vocabulary.** Categories, tags, counts, toggles and buttons
    are all rounded pills/chips with light fills and right-aligned muted counts.
 6. **Thin line icons.** Monochrome outline glyphs (Material "outline" family),
    tinted secondary gray; white when sitting on a green button.
-7. **Signature gradient.** A thin `blue → green → amber` line
+7. **Signature gradient.** A `blue → green → amber` line
    (`#4C8DFF → #34C77B → #F2C14E`) used as a brand flourish under headers /
    card tops — the one place color is allowed to be loud.
-8. **Calm density.** Airy spacing, content breathes, restrained palette. The
-   neutral gray pill (`#8A887F`) is the *disabled/quiet* state; green is *go*.
+8. **Calm density.** Airy spacing, content breathes, restrained palette.
+   Materials are translucent on the web (`backdrop-filter` glass over content),
+   hairline-separated, with soft layered shadows. Buttons respond on press
+   (`scale .97`, 100ms) and respect `prefers-reduced-motion`.
 
 ## Tokens
 
 | Token            | Hex       | Use                                  |
 |------------------|-----------|--------------------------------------|
-| canvas           | `#FBFBF9` | page background                      |
-| surface          | `#F6F6F3` | sidebar / panels                     |
+| canvas           | `#F5F5F7` | page background                      |
+| surface          | `#EFEFF2` | sidebar / panels                     |
 | card             | `#FFFFFF` | cards, inputs                        |
-| border           | `#E9E8E3` | hairlines, input strokes             |
-| ink              | `#1C1B19` | primary text                         |
-| text-2           | `#6E6C66` | secondary text                       |
-| text-3           | `#9A988F` | tertiary / micro labels              |
+| border           | `#E3E3E8` | hairlines, input strokes             |
+| ink              | `#1D1D1F` | primary text                         |
+| text-2           | `#6E6E73` | secondary text                       |
+| text-3           | `#86868B` | tertiary / micro labels              |
 | green            | `#2E7D46` | accent / primary / links / live dot  |
-| green-soft       | `#E6F0E8` | selected pill bg / callouts / icon bg|
+| green-soft       | `#E9F2EC` | selected pill bg / callouts / icon bg|
 | green-text       | `#2E7D46` | text on green-soft                   |
-| chip             | `#F1F0EB` | tag / count chips                    |
-| neutral          | `#8A887F` | disabled / quiet button              |
+| chip             | `#ECECF0` | tag / count chips                    |
+| neutral          | `#8E8E93` | disabled / quiet button              |
 | grad-blue        | `#4C8DFF` | gradient stop 1                      |
 | grad-green       | `#34C77B` | gradient stop 2                      |
 | grad-amber       | `#F2C14E` | gradient stop 3                      |
 | ok / err / idle  | green / `#D14343` / `#B6B4AC` | status states        |
 
-Radii: card `16`, input `12`, pill `999`, thumb `10`.
-Type scale: title `20–24/700`, label `11/600 uppercase +0.08em`, body `14–15/400`.
+Radii: card `18`, input `14`, pill `999`, thumb `10`.
+Type scale: display `34–56/-3%`, title `20–24/700/-2%`, label
+`11/600 uppercase +0.08em`, body `14–15/400`.
 
 ## Per-surface adaptation
 
-- **Mac web console** mirrors *Komodos Links* literally: left sidebar (brand +
-  nav with right-aligned counts + a `MODES` category list + footer), main column
-  with a big rounded *compose* card, a search/sort row that filters the
-  activity grid, and a grid of *recent send* cards (mode pill, gradient accent
-  line, title, body, `#mode #source` chips, footer actions).
+- **Mac web console** gets the product-page treatment: a display hero ("Talk.
+  Type. Anywhere.") with the gradient flourish, a glass sidebar and glass cards
+  (`backdrop-filter: blur(20px) saturate(180%)`), a pill segmented control,
+  capsule send button, and scroll-reveal on cards. Dark mode is pure black
+  glass; `prefers-reduced-motion` collapses reveals to instant.
 - **Android** is too narrow for a sidebar, so the same language is expressed as
   a top brand bar (mark + title + gear), the gradient accent line, then stacked
-  white hairline cards (Connection / Compose) with pill buttons and a green-soft
-  tip callout.
+  hairline cards (Compose) with capsule buttons, 56dp controls, negative
+  tracking on the brand title, and a green-soft tip callout. Pure OLED black
+  stays `#000`.
