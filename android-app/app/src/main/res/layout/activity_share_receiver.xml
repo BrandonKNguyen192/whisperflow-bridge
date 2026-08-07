@@ -123,6 +123,9 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="2"
+                    android:gravity="center"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:text="Type"
                     android:textSize="14sp"
                     android:textStyle="bold"
@@ -132,8 +135,7 @@
                     app:iconGravity="textStart"
                     app:iconSize="18dp"
                     app:iconPadding="6dp"
-                    app:iconTint="@android:color/white"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+                    app:iconTint="@android:color/white" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnClipboard"
@@ -142,6 +144,9 @@
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:gravity="center"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:text="Copy"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
@@ -152,7 +157,6 @@
                     app:iconSize="16dp"
                     app:iconPadding="4dp"
                     app:iconTint="@color/accent"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
                     app:strokeColor="@color/border" />
 
                 <com.google.android.material.button.MaterialButton
@@ -161,6 +165,9 @@
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:gravity="center"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:text="Enter"
                     android:textColor="@color/accent"
                     android:textSize="13sp"
@@ -171,7 +178,6 @@
                     app:iconSize="16dp"
                     app:iconPadding="4dp"
                     app:iconTint="@color/accent"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
                     app:strokeColor="@color/accent" />
 
                 <com.google.android.material.button.MaterialButton
@@ -181,6 +187,9 @@
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:gravity="center"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:text="Close"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp"
@@ -190,8 +199,7 @@
                     app:iconGravity="textStart"
                     app:iconSize="16dp"
                     app:iconPadding="4dp"
-                    app:iconTint="@color/text_secondary"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+                    app:iconTint="@color/text_secondary" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
