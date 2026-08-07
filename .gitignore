@@ -1,0 +1,28 @@
+# Build artifacts
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+android-app/gradle/wrapper/gradle-wrapper.jar
+android-app/gradlew
+android-app/gradlew.bat
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# APK
+*.apk
+
+# Logs
+/tmp/

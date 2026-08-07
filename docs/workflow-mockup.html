@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Whisper Bridge — workflow</title>
+<style>
+:root{
+ --canvas:#FBFBF9; --surface:#F6F6F3; --card:#fff; --border:#E9E8E3; --border2:#DCDBD4;
+ --ink:#1C1B19; --t2:#6E6C66; --t3:#9A988F;
+ --green:#2E7D46; --green-soft:#E6F0E8; --chip:#F1F0EB; --neutral:#8A887F;
+ --blue:#4C8DFF; --g2:#34C77B; --amber:#F2C14E;
+ --grad:linear-gradient(90deg,var(--blue),var(--g2),var(--amber));
+ --r-card:16px; --r-pill:999px; --shadow:0 1px 2px rgba(28,27,25,.04),0 12px 32px rgba(28,27,25,.05);
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--canvas); color:var(--ink);
+ font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+ -webkit-font-smoothing:antialiased; line-height:1.5}
+svg{display:block}
+.wrap{max-width:1160px; margin:0 auto; padding:30px 28px 64px}
+
+/* brand bar */
+.topbar{display:flex; align-items:center; gap:12px}
+.btile{width:38px; height:38px; border-radius:11px; background:var(--green-soft); color:var(--green);
+ display:flex; align-items:center; justify-content:center}
+.btile svg{width:20px; height:20px}
+.topbar h1{font-size:20px; margin:0; letter-spacing:-.01em}
+.topbar p{margin:2px 0 0; color:var(--t2); font-size:13px}
+.tagline{margin-left:auto; background:var(--chip); color:var(--t2); border-radius:var(--r-pill);
+ padding:6px 12px; font-size:12px; font-weight:600}
+.gradline{height:3px; border-radius:2px; background:var(--grad); margin:18px 0 26px}
+
+/* steps */
+.steps{display:flex; align-items:stretch; gap:10px; flex-wrap:wrap}
+.step{flex:1 1 220px; min-width:220px; background:var(--card); border:1px solid var(--border);
+ border-radius:var(--r-card); overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow)}
+.step .gl{height:3px; background:var(--grad)}
+.step .body{padding:16px; display:flex; flex-direction:column; align-items:center; text-align:center; flex:1}
+.stepno{align-self:flex-start; background:var(--green-soft); color:var(--green); border-radius:var(--r-pill);
+ padding:3px 10px; font-size:12px; font-weight:700}
+.step h3{margin:12px 0 2px; font-size:15px}
+.step .cap{color:var(--t2); font-size:12.5px; margin:0 0 14px}
+.frame{margin-top:auto}
+.arrow{display:flex; align-items:center; color:var(--t3); flex:0 0 22px; justify-content:center}
+.arrow svg{width:22px; height:22px}
+
+/* device frames */
+.phone{width:148px; height:288px; border:6px solid var(--ink); border-radius:26px; background:#fff;
+ position:relative; padding:18px 10px 10px; overflow:hidden; box-shadow:var(--shadow)}
+.phone::before{content:''; position:absolute; top:9px; left:50%; transform:translateX(-50%);
+ width:44px; height:5px; border-radius:6px; background:var(--border)}
+.mac{width:228px; height:150px; border:6px solid var(--ink); border-radius:12px; background:#fff;
+ position:relative; overflow:hidden; box-shadow:var(--shadow)}
+.mac .bar{height:20px; background:var(--surface); border-bottom:1px solid var(--border);
+ display:flex; align-items:center; gap:5px; padding:0 9px}
+.mac .bar i{width:8px; height:8px; border-radius:50%; display:block}
+.mac .bar i:nth-child(1){background:#E7A9A2} .mac .bar i:nth-child(2){background:#E4D39A} .mac .bar i:nth-child(3){background:#A9D3B4}
+.mac .screen{padding:12px}
+
+/* mini ui atoms */
+.mic{width:46px; height:46px; border-radius:50%; background:var(--green-soft); color:var(--green);
+ display:flex; align-items:center; justify-content:center; margin:6px auto 12px}
+.mic svg{width:22px; height:22px}
+.line{height:8px; border-radius:5px; background:var(--chip); margin:7px 0}
+.line.w90{width:90%} .line.w70{width:70%} .line.w50{width:50%} .line.w40{width:40%}
+.line.txt{background:#ECEAE3}
+.pill{display:inline-flex; align-items:center; gap:6px; border-radius:var(--r-pill); padding:7px 12px;
+ font-size:11px; font-weight:600}
+.pill.green{background:var(--green); color:#fff}
+.pill.ghost{background:#fff; color:var(--ink); border:1px solid var(--border)}
+.pill.chip{background:var(--chip); color:var(--t2)}
+.row{display:flex; gap:6px; justify-content:center; margin-top:10px}
+.sheet{position:absolute; left:6px; right:6px; bottom:6px; background:#fff; border:1px solid var(--border);
+ border-radius:14px 14px 0 0; padding:10px; box-shadow:0 -6px 18px rgba(28,27,25,.08)}
+.sheet .grab{width:30px; height:4px; border-radius:4px; background:var(--border); margin:0 auto 8px}
+.srow{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:10px; font-size:11px; color:var(--t2)}
+.srow.on{background:var(--green-soft); color:var(--green); font-weight:600}
+.srow .ti{width:18px; height:18px; border-radius:6px; background:var(--chip); flex:0 0 18px}
+.srow.on .ti{background:#fff; color:var(--green); display:flex; align-items:center; justify-content:center}
+.srow.on .ti svg{width:12px; height:12px}
+.brandmini{width:24px; height:24px; border-radius:7px; background:var(--green-soft); color:var(--green);
+ display:flex; align-items:center; justify-content:center; margin:0 auto 8px}
+.brandmini svg{width:14px; height:14px}
+.field{border:1px solid var(--border); border-radius:9px; padding:9px 10px; position:relative}
+.field .caret{display:inline-block; width:2px; height:13px; background:var(--green); vertical-align:-2px; margin-left:1px;
+ animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.vchip{position:absolute; top:7px; right:8px; background:var(--chip); color:var(--t2); border-radius:var(--r-pill);
+ padding:2px 7px; font-size:9px; font-weight:700}
+
+/* notes */
+.notes{display:grid; grid-template-columns:1.3fr 1fr; gap:14px; margin-top:26px}
+.callout{background:var(--green-soft); border-radius:var(--r-card); padding:16px 18px}
+.callout h4{margin:0 0 6px; font-size:13px; color:var(--green); display:flex; align-items:center; gap:8px}
+.callout h4 svg{width:16px; height:16px}
+.callout p{margin:0; font-size:13px; color:var(--t2)}
+.arch{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card); padding:16px 18px}
+.arch h4{margin:0 0 10px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--t3)}
+.flow{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px}
+.node{background:var(--chip); color:var(--ink); border-radius:10px; padding:7px 11px; font-weight:600}
+.node.g{background:var(--green-soft); color:var(--green)}
+.flow .ar{color:var(--t3)}
+.foot{margin-top:24px; color:var(--t3); font-size:12px; display:flex; gap:8px; align-items:center}
+.foot .dot{width:7px; height:7px; border-radius:50%; background:var(--green)}
+@media (max-width:900px){ .arrow{display:none} .notes{grid-template-columns:1fr} }
+</style></head><body>
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="btile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></span>
+    <div><h1>Whisper Bridge</h1><p>Walkie‑talkie dictation: speak on your phone → text lands on your Mac</p></div>
+    <span class="tagline">komodos‑ui</span>
+  </div>
+  <div class="gradline"></div>
+
+  <div class="steps">
+
+    <!-- 1 SPEAK -->
+    <div class="step"><div class="gl"></div><div class="body">
+      <span class="stepno">Step 1</span>
+      <h3>Speak</h3>
+      <p class="cap">Talk into Whisper Flow — it transcribes on‑device, free on Android.</p>
+      <div class="frame"><div class="phone">
+        <div class="mic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></div>
+        <div class="line txt w90"></div><div class="line txt w70"></div><div class="line txt w50"></div>
+        <div class="row"><span class="pill ghost">Share</span></div>
+      </div></div>
+    </div></div>
+
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 2 SHARE -->
+    <div class="step"><div class="gl"></div><div class="body">
+      <span class="stepno">Step 2</span>
+      <h3>Share</h3>
+      <p class="cap">Tap Share and pick <b>Whisper Bridge</b> from the sheet. No edits to Whisper Flow.</p>
+      <div class="frame"><div class="phone">
+        <div class="line txt w70" style="margin-top:6px"></div><div class="line txt w90"></div><div class="line txt w40"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="srow"><span class="ti"></span> Messages</div>
+          <div class="srow on"><span class="ti"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></span> Whisper Bridge</div>
+          <div class="srow"><span class="ti"></span> Notes</div>
+        </div>
+      </div></div>
+    </div></div>
+
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 3 BRIDGE -->
+    <div class="step"><div class="gl"></div><div class="body">
+      <span class="stepno">Step 3</span>
+      <h3>Bridge</h3>
+      <p class="cap">The bridge app fires the text over your local WiFi <b>or Tailscale</b> to the Mac server.</p>
+      <div class="frame"><div class="phone">
+        <div class="brandmini"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></div>
+        <div class="line txt w90"></div><div class="line txt w70"></div>
+        <div class="row"><span class="pill green">Type</span><span class="pill ghost">Copy</span></div>
+        <div class="row"><span class="pill chip" style="color:var(--green)">✓ Sent to Mac</span></div>
+      </div></div>
+    </div></div>
+
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 4 PASTE -->
+    <div class="step"><div class="gl"></div><div class="body">
+      <span class="stepno">Step 4</span>
+      <h3>Paste on Mac</h3>
+      <p class="cap">The server copies the text and simulates ⌘V into whatever field has focus.</p>
+      <div class="frame"><div class="mac">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="screen">
+          <div class="field"><span class="vchip">⌘V</span>
+            <div class="line txt w90" style="margin:2px 0 6px"></div>
+            <div class="line txt w70" style="margin:0; display:inline-block; width:60%"></div><span class="caret"></span>
+          </div>
+        </div>
+      </div></div>
+    </div></div>
+
+  </div>
+
+  <div class="notes">
+    <div class="callout">
+      <h4><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg> How it knows where to paste</h4>
+      <p>There is no per‑app integration. You click into the target field on your Mac first (a chat box, an email, a doc), then dictate. The server puts the text on the clipboard and presses ⌘V, so it lands exactly where your cursor is — in any app.</p>
+    </div>
+    <div class="callout">
+      <h4><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3z"/></svg> Away from home? Same bridge over Tailscale</h4>
+      <p>Install Tailscale on the Mac and the phone. The Mac gets a stable tailnet address (e.g. <code>100.x.y.z</code> or a name like <code>mac‑studio</code>) — put that in the app's host field instead of the LAN IP. The WireGuard tunnel is encrypted end‑to‑end, so plain HTTP inside it is fine and you need no certificates. Start the server with <code>--token</code> (or <code>WHISPERFLOW_TOKEN</code>) and paste the same value into the app's Token field so every request must carry it. Leave Tailscale <b>Funnel</b> off — that would publish the port to the open internet.</p>
+    </div>
+    <div class="arch">
+      <h4>Architecture · LAN or Tailscale</h4>
+      <div class="flow">
+        <span class="node">Android · Whisper Flow</span><span class="ar">→</span>
+        <span class="node">Bridge app</span><span class="ar">→ HTTP over WiFi / Tailscale →</span>
+        <span class="node g">Mac server.py</span><span class="ar">→ pbcopy + ⌘V →</span>
+        <span class="node">focused field</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span class="dot"></span> Whisper Flow Bridge · komodos‑ui design language · on your WiFi — or encrypted end‑to‑end over Tailscale when you are remote</div>
+</div>
+</body></html>
