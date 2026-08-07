@@ -292,6 +292,22 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
  .side{display:none}
  .main{padding:18px 16px 48px}
 }
+
+@media (prefers-color-scheme:dark){
+ :root{
+  --canvas:#000; --surface:#000; --card:#0D0D0D; --border:#2A2A2A; --border2:#333;
+  --ink:#E8E8E8; --t2:#9E9E9E; --t3:#6E6E6E;
+  --green:#4ADE80; --green-soft:#0F2A1A; --chip:#1A1A1A; --neutral:#6E6E6E; --err:#EF4444;
+  --blue:#4C8DFF; --g2:#34C77B; --amber:#F2C14E;
+  --grad:linear-gradient(90deg,var(--blue),var(--g2),var(--amber));
+ }
+ .send:not(:disabled){background:var(--green);color:#000}
+ .ni.active{color:var(--green)}
+ .rcard:hover{border-color:var(--border2)}
+ .toast{background:var(--ink);color:#000}
+ .toast.ok{background:var(--green);color:#000}
+}
+
 </style></head><body>
 
 <aside class="side">
