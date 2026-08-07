@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.WhisperBridge" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.WhisperBridge.Base" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/accent</item>
         <item name="colorOnPrimary">@color/on_neutral</item>
         <item name="colorPrimaryContainer">@color/green_soft</item>
@@ -15,8 +15,9 @@
         <item name="android:statusBarColor">@color/surface</item>
         <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
         <item name="android:navigationBarColor">@color/card_bg</item>
-        <item name="android:windowLightNavigationBar">?attr/isLightTheme</item>
     </style>
+
+    <style name="Theme.WhisperBridge" parent="Theme.WhisperBridge.Base" />
 
     <!-- komodos corner shapes -->
     <style name="ShapeKomodosPill">
