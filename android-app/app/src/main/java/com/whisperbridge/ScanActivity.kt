@@ -11,7 +11,7 @@ import com.google.zxing.integration.android.IntentIntegrator
 /**
  * Full-screen QR scanner (ZXing). Requests the CAMERA permission at runtime
  * (required on Android 6+), then shows the capture UI. On a successful scan it
- * parses the pairing payload, persists host/port/token, and returns RESULT_OK so
+ * parses the pairing payload, saves to ProfileManager, and returns RESULT_OK so
  * MainActivity refreshes its fields. No layout — the ZXing capture UI is shown.
  */
 class ScanActivity : AppCompatActivity() {
@@ -59,11 +59,17 @@ class ScanActivity : AppCompatActivity() {
         val res = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
         val parsed = res?.contents?.let { Pairing.parse(it) }
         if (parsed != null) {
-            getSharedPreferences("bridge", MODE_PRIVATE).edit()
-                .putString("host", parsed.host)
-                .putString("port", parsed.port.toString())
-                .putString("token", parsed.token)
-                .apply()
+            // Add scanned host as a new profile, or update existing one with same host
+            val name = if (parsed.host.contains("100.")) "Tailscale" else "Mac"
+            val profiles = ProfileManager.getAll(this)
+            val existingIdx = profiles.indexOfFirst { it.host == parsed.host }
+            if (existingIdx >= 0) {
+                ProfileManager.update(this, existingIdx,
+                    ProfileManager.Profile(name, parsed.host, parsed.port, parsed.token))
+                ProfileManager.setActiveIndex(this, existingIdx)
+            } else {
+                ProfileManager.add(this, ProfileManager.Profile(name, parsed.host, parsed.port, parsed.token))
+            }
             setResult(RESULT_OK)
         } else {
             setResult(RESULT_CANCELED)

@@ -1,24 +1,28 @@
 package com.whisperbridge
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.View
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import com.whisperbridge.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val prefs by lazy { getSharedPreferences("bridge", MODE_PRIVATE) }
     private val scanReq = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,17 +30,16 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Restore saved settings
-        binding.etHost.setText(prefs.getString("host", ""))
-        binding.etPort.setText(prefs.getString("port", "9877"))
-        binding.etToken.setText(prefs.getString("token", ""))
+        ProfileManager.migrateIfNeeded(this)
+        refreshProfileChips()
+        loadActiveProfile()
 
+        binding.btnSaveProfile.setOnClickListener { saveCurrentProfile() }
         binding.btnConnect.setOnClickListener { testConnection() }
         binding.btnScan.setOnClickListener { launchScan() }
         binding.btnSend.setOnClickListener { sendText("type") }
         binding.btnClipboard.setOnClickListener { sendText("clipboard") }
 
-        // Send on Enter (IME action)
         binding.etText.setOnEditorActionListener { _, _, _ ->
             sendText("type")
             true
@@ -46,20 +49,147 @@ class MainActivity : AppCompatActivity() {
         handlePairIntent(intent)
     }
 
-    override fun onPause() {
-        super.onPause()
-        prefs.edit()
-            .putString("host", binding.etHost.text.toString().trim())
-            .putString("port", binding.etPort.text.toString().trim())
-            .putString("token", binding.etToken.text.toString().trim())
-            .apply()
+    // ── Profile chips ────────────────────────────────────────────
+
+    private fun refreshProfileChips() {
+        val row = binding.profileChipRow
+        row.removeAllViews()
+        val profiles = ProfileManager.getAll(this)
+        val activeIdx = ProfileManager.getActiveIndex(this)
+
+        profiles.forEachIndexed { i, p ->
+            val chip = MaterialButton(this).apply {
+                text = p.name
+                textSize = 13f
+                isAllCaps = false
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(28, 0, 28, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    72
+                ).apply {
+                    marginEnd = 12
+                }
+                cornerRadius = 9999
+                strokeWidth = 1
+                strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+                if (i == activeIdx) {
+                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.green_soft))
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.green_text))
+                } else {
+                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                }
+                setOnClickListener { selectProfile(i) }
+                setOnLongClickListener {
+                    confirmDeleteProfile(i)
+                    true
+                }
+            }
+            row.addView(chip)
+        }
+
+        // "+" add chip
+        val addChip = MaterialButton(this).apply {
+            text = "+"
+            textSize = 18f
+            isAllCaps = false
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(24, 0, 24, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                72
+            )
+            cornerRadius = 9999
+            strokeWidth = 1
+            strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+            setOnClickListener { promptAddProfile() }
+        }
+        row.addView(addChip)
     }
+
+    private fun selectProfile(index: Int) {
+        saveCurrentProfile()
+        ProfileManager.setActiveIndex(this, index)
+        loadActiveProfile()
+        refreshProfileChips()
+        updateStatus("Switched profile", false)
+        vibrate()
+    }
+
+    private fun loadActiveProfile() {
+        val p = ProfileManager.getActive(this)
+        if (p != null) {
+            binding.etHost.setText(p.host)
+            binding.etPort.setText(p.port.toString())
+            binding.etToken.setText(p.token)
+        }
+    }
+
+    private fun saveCurrentProfile() {
+        val profiles = ProfileManager.getAll(this)
+        val idx = ProfileManager.getActiveIndex(this)
+        if (idx in profiles.indices) {
+            val updated = profiles[idx].copy(
+                host = binding.etHost.text.toString().trim(),
+                port = binding.etPort.text.toString().trim().toIntOrNull() ?: 9877,
+                token = binding.etToken.text.toString().trim()
+            )
+            ProfileManager.update(this, idx, updated)
+        }
+    }
+
+    private fun promptAddProfile() {
+        val input = EditText(this).apply {
+            hint = "Profile name (e.g. Mac Studio)"
+            setPadding(32, 32, 32, 32)
+            textSize = 16f
+        }
+        AlertDialog.Builder(this)
+            .setTitle("New Profile")
+            .setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val name = input.text.toString().trim().ifEmpty { "Mac" }
+                ProfileManager.add(
+                    this,
+                    ProfileManager.Profile(name, "", 9877, "")
+                )
+                refreshProfileChips()
+                loadActiveProfile()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmDeleteProfile(index: Int) {
+        val profiles = ProfileManager.getAll(this)
+        if (index !in profiles.indices) return
+        if (profiles.size <= 1) {
+            Toast.makeText(this, "Can't delete the last profile", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val name = profiles[index].name
+        AlertDialog.Builder(this)
+            .setTitle("Delete \"$name\"?")
+            .setMessage("This profile will be removed.")
+            .setPositiveButton("Delete") { _, _ ->
+                ProfileManager.remove(this, index)
+                refreshProfileChips()
+                loadActiveProfile()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ── Connection helpers ───────────────────────────────────────
 
     private fun hostPort(): Pair<String, Int>? {
         val host = binding.etHost.text.toString().trim()
         val port = binding.etPort.text.toString().trim().toIntOrNull() ?: 9877
         if (host.isEmpty()) {
-            Toast.makeText(this, "Enter your Mac's IP address", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Enter your Mac's IP address", Toast.LENGTH_LONG).show()
             return null
         }
         return host to port
@@ -131,9 +261,8 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == scanReq && resultCode == RESULT_OK) {
-            binding.etHost.setText(prefs.getString("host", ""))
-            binding.etPort.setText(prefs.getString("port", "9877"))
-            binding.etToken.setText(prefs.getString("token", ""))
+            loadActiveProfile()
+            refreshProfileChips()
             updateStatus("Paired via QR", true)
             vibrate()
         }
@@ -149,17 +278,19 @@ class MainActivity : AppCompatActivity() {
         val data = intent?.data ?: return
         if (data.scheme != "whisperbridge") return
         val parsed = Pairing.parse(data.toString()) ?: return
-        binding.etHost.setText(parsed.host)
-        binding.etPort.setText(parsed.port.toString())
-        binding.etToken.setText(parsed.token)
-        prefs.edit()
-            .putString("host", parsed.host)
-            .putString("port", parsed.port.toString())
-            .putString("token", parsed.token)
-            .apply()
+
+        val name = if (parsed.host.contains("100.")) "Tailscale" else "Mac"
+        ProfileManager.add(
+            this,
+            ProfileManager.Profile(name, parsed.host, parsed.port, parsed.token)
+        )
+        refreshProfileChips()
+        loadActiveProfile()
         updateStatus("Paired via link", true)
         vibrate()
     }
+
+    // ── Haptics ──────────────────────────────────────────────────
 
     private fun vibrate() {
         try {

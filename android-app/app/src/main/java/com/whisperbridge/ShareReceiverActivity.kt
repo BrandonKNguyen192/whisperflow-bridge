@@ -15,12 +15,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Receives text shared from Whisper Flow (or any app) via Android's
- * Share sheet, then forwards it to the Mac bridge server.
+ * Share sheet, then forwards it to the Mac bridge server using the
+ * active profile from ProfileManager.
  */
 class ShareReceiverActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityShareReceiverBinding
-    private val prefs by lazy { getSharedPreferences("bridge", MODE_PRIVATE) }
     private var sharedText: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,19 +48,16 @@ class ShareReceiverActivity : AppCompatActivity() {
         binding.btnDismiss.setOnClickListener { finish() }
 
         // Auto-send if a host is configured
-        val host = prefs.getString("host", "") ?: ""
-        if (host.isNotEmpty()) {
+        val profile = ProfileManager.getActive(this)
+        if (profile != null && profile.host.isNotEmpty()) {
             forward("type")
         }
     }
 
     private fun forward(mode: String) {
-        val host = prefs.getString("host", "") ?: ""
-        val port = prefs.getString("port", "9877")?.toIntOrNull() ?: 9877
-        val token = prefs.getString("token", "") ?: ""
-
-        if (host.isEmpty()) {
-            binding.tvStatus.text = "⚠ No Mac IP configured — open the app first"
+        val profile = ProfileManager.getActive(this)
+        if (profile == null || profile.host.isEmpty()) {
+            binding.tvStatus.text = "No Mac configured — open the app first"
             binding.tvStatus.setTextColor(
                 ContextCompat.getColor(this, R.color.status_err)
             )
@@ -76,12 +73,13 @@ class ShareReceiverActivity : AppCompatActivity() {
         binding.progress.visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            val result = BridgeClient.sendText(host, port, sharedText, mode, "whisperflow-share", token)
+            val result = BridgeClient.sendText(
+                profile.host, profile.port, sharedText, mode, "whisperflow-share", profile.token
+            )
             binding.progress.visibility = View.GONE
-
             if (result.ok) {
                 vibrate()
-                val label = if (mode == "clipboard") "📋 Copied to Mac clipboard" else "✓ Typed on Mac"
+                val label = if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
                 binding.tvStatus.text = label
                 binding.tvStatus.setTextColor(
                     ContextCompat.getColor(this@ShareReceiverActivity, R.color.status_ok)
@@ -89,7 +87,7 @@ class ShareReceiverActivity : AppCompatActivity() {
                 // Auto-close after a short delay on success
                 binding.root.postDelayed({ finish() }, 1200)
             } else {
-                binding.tvStatus.text = "✗ ${result.message}"
+                binding.tvStatus.text = "${result.message}"
                 binding.tvStatus.setTextColor(
                     ContextCompat.getColor(this@ShareReceiverActivity, R.color.status_err)
                 )

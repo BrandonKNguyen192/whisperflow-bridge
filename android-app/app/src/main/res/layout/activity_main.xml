@@ -64,11 +64,26 @@
             android:layout_marginTop="16dp"
             android:background="@drawable/gradient_accent" />
 
+        <!-- Profile switcher -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/profileChipRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
         <!-- Connection card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="14dp"
             app:cardBackgroundColor="@color/card_bg"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
@@ -177,6 +192,19 @@
                         android:text="Not connected"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveProfile"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="8dp"
+                        android:text="Save"
+                        android:textColor="@color/accent"
+                        android:textSize="13sp"
+                        app:cornerRadius="999dp"
+                        app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
+                        app:strokeColor="@color/border" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnScan"
