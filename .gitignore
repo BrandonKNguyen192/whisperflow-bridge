@@ -21,8 +21,10 @@ Thumbs.db
 .vscode/
 *.iml
 
-# APK
+# APK — only track builds/ directory
 *.apk
+!builds/*.apk
+!builds/*.sha256
 
 # Logs
 /tmp/
