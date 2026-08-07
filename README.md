@@ -11,6 +11,17 @@ Talk into **Whisper Flow** on your Android phone → text appears on your Mac, t
 └──────────────┘                            └──────────────┘
 ```
 
+## Features
+
+- **Multi-profile switching** — toggle between multiple Macs (MacBook, Studio, etc.) with one-tap profile chips. Each profile stores its own host, port, and token.
+- **Pure OLED dark mode** — the Android app and web console follow your system preference. True black (#000) background with a vibrant green accent.
+- **Enter-after-type** — optional checkbox to auto-press Return/Enter after pasting text. Perfect for sending messages or submitting forms.
+- **Pair by QR** — scan a QR code from the Mac console to auto-fill connection details.
+- **Three modes** — Type (⌘V paste), Clipboard (copy only), and Append (add to existing clipboard).
+- **Remote via Tailscale** — works anywhere, not just on your home WiFi. Token-based auth keeps it secure.
+- **Menu bar app** — always-on with live status, one-click pairing, and login-at-launch support.
+- **Share sheet integration** — share transcribed text directly from Whisper Flow to your Mac.
+
 ## How It Works
 
 1. **Speak** into Whisper Flow on your Android phone
@@ -176,17 +187,22 @@ The QR is generated in the browser by a vendored copy of Kazuhiko Arase's MIT-li
 Whisperflow Bridge/
 ├── mac-server/
 │   ├── server.py              # Bridge engine (zero dependencies)
+│   ├── launch.py              # Convenience launcher: server + overlay
+│   ├── overlay.py             # Floating status pill (tkinter)
 │   ├── menubar.py             # Menu-bar app + login item (needs `rumps`)
 │   └── qrcode.js              # Vendored QR encoder for the console (MIT)
 ├── android-app/               # Android Studio project
 │   ├── app/src/main/
 │   │   ├── java/com/whisperbridge/
-│   │   │   ├── MainActivity.kt           # Manual entry + settings + scan/deep-link
-│   │   │   ├── ShareReceiverActivity.kt  # Receives shared text
+│   │   │   ├── MainActivity.kt           # Multi-profile UI + chip toggles + manual entry
+│   │   │   ├── ShareReceiverActivity.kt  # Receives shared text from Whisper Flow
 │   │   │   ├── ScanActivity.kt           # In-app QR scanner (ZXing)
-│   │   │   ├── Pairing.kt                # Parses pairing QR / deep link
-│   │   │   └── BridgeClient.kt           # HTTP client (+ token)
-│   │   └── res/                          # Layouts, colors, icons
+│   │   │   ├── ProfileManager.kt         # Multi-profile storage (JSON in SharedPreferences)
+│   │   │   ├── Pairing.kt                # Parses pairing QR / deep link URLs
+│   │   │   └── BridgeClient.kt           # HTTP client (type, clipboard, append, enter_after)
+│   │   └── res/                          # Layouts, colors (light + dark), icons, themes
 │   └── build.gradle.kts
+├── DESIGN.md                    # Komodos design language reference
+├── LICENSE                      # MIT
 └── README.md
 ```
