@@ -634,7 +634,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnEnter.isEnabled = false
         lifecycleScope.launch {
             val result = BridgeClient.sendText(
-                host, port, " ", "enter", "android-main", activeToken(),
+                host, port, "", "enter", "android-main", activeToken(),
                 enterAfter = false
             )
             binding.btnEnter.isEnabled = true
