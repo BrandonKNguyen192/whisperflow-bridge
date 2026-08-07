@@ -48,11 +48,6 @@ class ShareReceiverActivity : AppCompatActivity() {
         binding.btnClipboard.setOnClickListener { forward("clipboard") }
         binding.btnDismiss.setOnClickListener { finish() }
         binding.btnEnter.setOnClickListener { forward("enter") }
-
-        val profile = ProfileManager.getActive(this)
-        if (profile != null && profile.host.isNotEmpty()) {
-            forward("type")
-        }
     }
 
     private fun applyAccentToView(root: View) {

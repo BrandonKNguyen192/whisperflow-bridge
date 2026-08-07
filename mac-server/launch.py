@@ -42,17 +42,22 @@ LOG_PATH = os.path.expanduser("~/Library/Logs/whisperbridge.log")
 
 def build_plist(port: int, token: str | None,
                 no_sound: bool = False, sound_name: str | None = None,
-                no_overlay: bool = False) -> str:
+                no_overlay: bool = False, log_content: bool = False,
+                allow_hosts: list[str] | None = None) -> str:
     """Build a LaunchAgent plist that keeps the bridge alive across reboots."""
     args = [sys.executable, os.path.abspath(__file__), "--port", str(port)]
-    if token:
-        args += ["--token", token]
+    # Token is resolved from TOKEN_FILE at startup, never in ProgramArguments
     if no_sound:
         args += ["--no-sound"]
     if sound_name:
         args += ["--sound", sound_name]
     if no_overlay:
         args += ["--no-overlay"]
+    if log_content:
+        args += ["--log-content"]
+    if allow_hosts:
+        for h in allow_hosts:
+            args += ["--allow-host", h]
     items = "".join(f"    <string>{xml_escape(a)}</string>\n" for a in args)
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -80,12 +85,17 @@ def build_plist(port: int, token: str | None,
 
 def install_login(port: int, token: str | None,
                   no_sound: bool = False, sound_name: str | None = None,
-                  no_overlay: bool = False) -> None:
+                  no_overlay: bool = False, log_content: bool = False,
+                  allow_hosts: list[str] | None = None) -> None:
     """Install a LaunchAgent that starts the bridge at login."""
     os.makedirs(os.path.dirname(PLIST_PATH), exist_ok=True)
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     with open(PLIST_PATH, "w", encoding="utf-8") as fh:
-        fh.write(build_plist(port, token, no_sound, sound_name, no_overlay))
+        fh.write(build_plist(port, token, no_sound, sound_name, no_overlay, log_content, allow_hosts))
+    os.chmod(PLIST_PATH, 0o600)
+    # Pre-create log at 0600 so launchd inherits restrictive permissions
+    fd = os.open(LOG_PATH, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    os.close(fd)
     # Validate plist syntax
     subprocess.run(["plutil", "-lint", PLIST_PATH], check=False)
     # Unload old instance, then load new
@@ -146,6 +156,8 @@ def main():
     ap.add_argument("--port", type=int, default=server.DEFAULT_PORT)
     ap.add_argument("--token", default=None)
     ap.add_argument("--clipboard-only", action="store_true")
+    ap.add_argument("--log-content", action="store_true", help="Log dictation text to stdout (off by default).")
+    ap.add_argument("--allow-host", action="append", default=[], help="Additional hostname for Host header validation.")
     ap.add_argument("--sound", default=None)
     ap.add_argument("--no-sound", action="store_true")
     ap.add_argument("--no-overlay", action="store_true")
@@ -157,31 +169,35 @@ def main():
                     help="Print the LaunchAgent plist to stdout (no side effects)")
     a = ap.parse_args()
 
-    token = a.token or os.environ.get("WHISPERFLOW_TOKEN") or None
+    token = server.resolve_token(a.token)
     no_sound = a.no_sound or os.environ.get("WHISPERFLOW_NO_SOUND") == "1"
     sound_name = a.sound or os.environ.get("WHISPERFLOW_SOUND")
     server.SOUND_ENABLED = not no_sound
     if sound_name:
         server.SOUND_NAME = sound_name
+    server.LOG_CONTENT = a.log_content
+    for h in a.allow_hosts:
+        if h:
+            server.ALLOWED_HOSTS.add(h.lower())
     if a.clipboard_only:
         server.BridgeHandler.default_mode = "clipboard"
 
     # Handle login-item commands
     if a.print_plist:
-        sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.no_overlay))
+        sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.no_overlay, a.log_content, a.allow_hosts))
         return
     if a.install_login:
-        install_login(a.port, token, no_sound, sound_name, a.no_overlay)
+        install_login(a.port, token, no_sound, sound_name, a.no_overlay, a.log_content, a.allow_hosts)
         return
     if a.uninstall_login:
         uninstall_login()
         return
 
-    server.AUTH_TOKEN = token
+    server.AUTH_TOKEN = server.resolve_token(a.token)
 
     # Start HTTP server
     try:
-        httpd = server.HTTPServer(("0.0.0.0", a.port), server.BridgeHandler)
+        httpd = server.BridgeServer(("0.0.0.0", a.port), server.BridgeHandler)
     except OSError as exc:
         print(f"  ✗ Cannot bind :{a.port} — {exc}")
         sys.exit(1)
@@ -197,7 +213,7 @@ def main():
   ║       Whisper Flow Bridge — Running          ║
   ╠══════════════════════════════════════════════╣
   ║  Port     :{a.port:<32}║
-  ║  Auth     : {"token (remote-safe)" if token else "none (LAN ok)":<35}║
+  ║  Auth     : token (remote-safe)                       ║
   ║  LAN      : http://{lan}:{a.port:<24}║
   ║  Tailscale: {f"http://{tail}:{a.port}" if tail else "not connected":<35}║
   ║  Console  : http://localhost:{a.port:<24}║

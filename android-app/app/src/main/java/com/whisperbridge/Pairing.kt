@@ -4,6 +4,17 @@ import android.net.Uri
 
 /** Parses a pairing payload (from a scanned QR or a deep link) into host/port/token. */
 object Pairing {
+    /** True for the Tailscale CGNAT range 100.64.0.0/10. */
+    fun isTailscale(host: String): Boolean {
+        val parts = host.split(".")
+        if (parts.size != 4) return false
+        val a = parts[0].toIntOrNull() ?: return false
+        val b = parts[1].toIntOrNull() ?: return false
+        return a == 100 && b in 64..127
+    }
+
+    fun labelFor(host: String): String = if (isTailscale(host)) "Tailscale" else "Mac"
+
     data class Parsed(val host: String, val port: Int, val token: String)
 
     fun parse(text: String): Parsed? {

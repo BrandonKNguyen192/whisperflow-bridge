@@ -673,11 +673,24 @@ class MainActivity : AppCompatActivity() {
         if (data.scheme != "whisperbridge") return
         val parsed = Pairing.parse(data.toString()) ?: return
 
-        val name = if (parsed.host.contains("100.")) "Tailscale" else "Mac"
-        ProfileManager.add(this, ProfileManager.Profile(name, parsed.host, parsed.port, parsed.token))
-        refreshProfileChips()
-        updateStatusView()
-        vibrate()
+        AlertDialog.Builder(this)
+            .setTitle("Pair with this Mac?")
+            .setMessage(
+                parsed.host + ":" + parsed.port + "\n\n" +
+                "Everything you dictate will be sent to this address. " +
+                "Only continue if you opened this link yourself."
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Pair") { _, _ ->
+                ProfileManager.add(
+                    this,
+                    ProfileManager.Profile(Pairing.labelFor(parsed.host), parsed.host, parsed.port, parsed.token)
+                )
+                refreshProfileChips()
+                updateStatusView()
+                vibrate()
+            }
+            .show()
     }
 
     // ── Haptics ──────────────────────────────────────────────────

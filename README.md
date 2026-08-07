@@ -7,14 +7,15 @@ Talk into **Whisper Flow** on your Android phone → text appears on your Mac, t
 1. **Download the APK** from [Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases) and install on your Android phone
 2. **Start the Mac server:**
    ```bash
-   cd mac-server && python3 launch.py --token mysecret123
+   cd mac-server && python3 launch.py
    ```
+   On first run a token is generated and saved to `~/.config/whisperbridge/token` (mode 0600). The token is printed once so you can pair your phone.
 3. **On the phone:** Open Whisper Bridge → tap the gear ⚙️ → enter your Mac's IP + port + token → tap **Test**
 4. **Use it:** Type in the app, or share from Whisper Flow → Whisper Bridge
 
 For Tailscale remote access:
 ```bash
-python3 launch.py --token mysecret123 --install-login
+python3 launch.py --install-login
 ```
 Then use your Mac's Tailscale IP (e.g. `100.x.x.x`) in the phone app. The `--install-login` flag makes it launch at boot and stay alive.
 
@@ -55,7 +56,7 @@ No dependencies — just Python 3 (built into macOS).
 
 ```bash
 cd mac-server
-python3 launch.py --token mysecret123
+python3 launch.py
 ```
 
 Then open **http://localhost:9877** in your browser — you'll see the console with a QR code to pair your phone.
@@ -64,7 +65,7 @@ Then open **http://localhost:9877** in your browser — you'll see the console w
 
 **Options:**
 ```bash
-python3 launch.py --token SECRET --install-login   # run at boot, stay alive (recommended)
+python3 launch.py --install-login   # run at boot, stay alive (recommended)
 python3 launch.py --port 8080                       # custom port
 python3 launch.py --no-sound                        # disable the chime
 python3 launch.py --uninstall-login                 # remove login item
@@ -74,6 +75,7 @@ python3 launch.py --uninstall-login                 # remove login item
 ```bash
 curl -X POST http://localhost:9877/send \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $(cat ~/.config/whisperbridge/token)" \
   -d '{"text": "Hello from the terminal!", "mode": "type"}'
 ```
 
@@ -86,7 +88,10 @@ ipconfig getifaddr en0
 
 ### 3. Android App
 
-**Download the APK** from [GitHub Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases) and install it on your phone. You'll need to allow "Install from unknown sources" in Android Settings.
+**Download the APK** from [GitHub Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases) and install it on your phone. You'll need to allow "Install from unknown sources" in Android Settings. Verify the download with:
+```bash
+shasum -a 256 app-release.apk
+```
 
 **To build from source:** Open the `android-app/` folder in Android Studio, sync Gradle, and Run. Requires JDK 17 and SDK 34.
 
@@ -143,14 +148,16 @@ The same server works away from home — no port forwarding, no certificates.
 
 1. Install **Tailscale** on the Mac and on the Android phone; sign in with the same account.
 2. On the Mac, note its tailnet address: `tailscale ip -4` (e.g. `100.64.1.23`) or its MagicDNS name (e.g. `mac-studio`).
-3. Start the server **with a token**: `python3 launch.py --token YOUR_SECRET` (or `export WHISPERFLOW_TOKEN=...`). The token gates `/send` and the web console.
+3. Start the server: `python3 launch.py`. A token is generated and persisted automatically — it gates `/send` and the web console without appearing in your shell history.
 4. In the app, put the tailnet address in **Host** and the same secret in **Token**, then tap **Test** — it verifies the token too.
 
-Why this is safe: Tailscale's WireGuard tunnel is encrypted end‑to‑end, so plain HTTP inside it is fine. The server already listens on `0.0.0.0`, so one running instance serves your LAN *and* your tailnet at once — at home use the LAN IP, away use the tailnet address. Keep Tailscale **Funnel** *off*; Funnel would publish the port to the public internet.
+Why this is safe: Tailscale's WireGuard tunnel is encrypted end‑to‑end, so plain HTTP inside it is fine.
+
+**⚠️ Important:** On a plain LAN (without Tailscale), the token and every dictated character travel in the clear and are readable by anything else on that Wi‑Fi. Use Tailscale whenever you're not on a trusted home network. The server already listens on `0.0.0.0`, so one running instance serves your LAN *and* your tailnet at once — at home use the LAN IP, away use the tailnet address. Keep Tailscale **Funnel** *off*; Funnel would publish the port to the public internet.
 
 ```bash
 # from anywhere on your tailnet
-curl -H "Authorization: Bearer YOUR_SECRET" -H 'Content-Type: application/json' \
+curl -H "Authorization: Bearer $(cat ~/.config/whisperbridge/token)" -H 'Content-Type: application/json' \
   -d '{"text": "dictated from a coffee shop", "mode": "type"}' \
   http://<tailnet-ip>:9877/send
 ```
@@ -161,7 +168,7 @@ curl -H "Authorization: Bearer YOUR_SECRET" -H 'Content-Type: application/json' 
 
 ```bash
 pip3 install rumps            # one-time; pulls PyObjC for the menu bar
-python3 mac-server/menubar.py --token YOUR_SECRET
+python3 mac-server/menubar.py
 ```
 
 ## Troubleshooting

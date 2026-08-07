@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext HTTP to local network (the Mac server) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">10.0.0.0</domain>
-        <domain includeSubdomains="false">192.168.0.0</domain>
-        <domain includeSubdomains="false">172.16.0.0</domain>
-    </domain-config>
+    <!-- The bridge speaks plain HTTP to a user-supplied LAN or tailnet address.
+         Confidentiality comes from Tailscale's WireGuard tunnel, not from TLS.
+         On a plain LAN the token and every dictated character travel in the clear. -->
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

@@ -60,7 +60,7 @@ class ScanActivity : AppCompatActivity() {
         val parsed = res?.contents?.let { Pairing.parse(it) }
         if (parsed != null) {
             // Add scanned host as a new profile, or update existing one with same host
-            val name = if (parsed.host.contains("100.")) "Tailscale" else "Mac"
+            val name = Pairing.labelFor(parsed.host)
             val profiles = ProfileManager.getAll(this)
             val existingIdx = profiles.indexOfFirst { it.host == parsed.host }
             if (existingIdx >= 0) {

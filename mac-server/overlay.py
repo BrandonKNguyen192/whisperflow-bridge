@@ -141,8 +141,6 @@ class FloatingPill:
             dot_color = GREEN
             # Pulse ring
             pulse_r = 5 + abs(self._pulse) * 3
-            pulse_alpha = int(max(0, 40 - abs(self._pulse) * 80))
-            pulse_hex = f"#{pulse_alpha:02x}{108:02x}{46:02x}"  # green with alpha
             self.canvas.create_oval(
                 dot_x - pulse_r, dot_y - pulse_r,
                 dot_x + pulse_r, dot_y + pulse_r,

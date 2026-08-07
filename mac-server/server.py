@@ -14,10 +14,14 @@ import os
 import re
 import socket
 import subprocess
+import threading
 import sys
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+import hmac
+import secrets
+import stat
 
 DEFAULT_PORT = 9877
 VERSION = "1.0.0"
@@ -25,6 +29,38 @@ AUTH_TOKEN = None  # set in main(); when set, /send + console require it
 
 # Live activity (read by the menu-bar app and /status)
 STATUS = {"count": 0, "last_preview": "", "last_source": "", "last_mode": "", "last_ts": ""}
+
+TOKEN_DIR = os.path.expanduser("~/.config/whisperbridge")
+TOKEN_FILE = os.path.join(TOKEN_DIR, "token")
+MAX_BODY = 1_000_000
+LOG_CONTENT = False
+ALLOWED_HOSTS: set[str] = set()
+
+
+def resolve_token(cli_token: str | None) -> str:
+    """Resolve the shared secret. Precedence: CLI > env > stored file > generate.
+
+    The token is always non-empty — the bridge injects keystrokes, so it must
+    never run unauthenticated. A generated token is persisted at 0600 so the
+    secret never has to appear in argv, shell history, or a LaunchAgent plist.
+    """
+    token = cli_token or os.environ.get("WHISPERFLOW_TOKEN")
+    if token:
+        return token
+    try:
+        with open(TOKEN_FILE, encoding="utf-8") as fh:
+            stored = fh.read().strip()
+        if stored:
+            return stored
+    except OSError:
+        pass
+    token = secrets.token_urlsafe(24)
+    os.makedirs(TOKEN_DIR, exist_ok=True)
+    os.chmod(TOKEN_DIR, stat.S_IRWXU)
+    fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(token + "\n")
+    return token
 
 def get_lan_ip():
     """Best-effort LAN/egress IPv4 via a UDP connect (no packets sent)."""
@@ -133,20 +169,19 @@ def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
             )
 
         return True
-    except subprocess.CalledProcessError as exc:
+    except (subprocess.CalledProcessError, OSError) as exc:
         print(f"  ✗ Failed to inject text: {exc}")
         return False
 
 def notify(title: str, message: str):
-    """Show a macOS notification (best-effort)."""
+    """Show a macOS notification (best-effort).
+
+    Arguments are passed via `on run argv` rather than interpolated, so text
+    containing quotes can never terminate the string literal and inject script.
+    """
+    script = 'on run argv\n display notification (item 1 of argv) with title (item 2 of argv)\nend run'
     try:
-        subprocess.run(
-            [
-                "osascript", "-e",
-                f'display notification "{message}" with title "{title}"',
-            ],
-            capture_output=True,
-        )
+        subprocess.run(["osascript", "-e", script, message, title], capture_output=True)
     except Exception:
         pass
 
@@ -394,8 +429,11 @@ select{border:1px solid var(--border); border-radius:var(--r-pill); padding:10px
 
 <script>
 @@QR_LIB@@
-var TOK = new URLSearchParams(location.search).get('token') || '';
-var WB = { lan:'@@LAN_IP@@', tail:'@@TAIL_IP@@', port:'@@PORT@@', token:'@@PAIR_TOKEN@@' };
+var WB = @@WB_JSON@@;
+var TOK = WB.token || new URLSearchParams(location.search).get('token') || '';
+if (location.search.indexOf('token=') >= 0) {
+  history.replaceState(null, '', location.pathname);
+}
 var pairNet = 'lan';
 function pairHost(net){ return (net==='tail' && WB.tail) ? WB.tail : WB.lan; }
 function pairPayload(net){
@@ -578,33 +616,43 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-WF-Token")
-        self.end_headers()
-
-    def _token_ok(self):
+    def _token_ok(self) -> bool:
+        """Header-only auth — used by /send and /status."""
         if not AUTH_TOKEN:
             return True
         auth = self.headers.get("Authorization", "")
-        if auth.startswith("Bearer ") and auth[7:].strip() == AUTH_TOKEN:
+        if auth.startswith("Bearer ") and hmac.compare_digest(auth[7:].strip(), AUTH_TOKEN):
             return True
-        if self.headers.get("X-WF-Token", "") == AUTH_TOKEN:
+        return hmac.compare_digest(self.headers.get("X-WF-Token", ""), AUTH_TOKEN)
+
+    def _console_token_ok(self) -> bool:
+        """Console bootstrap only. A browser cannot set headers on a navigation,
+        so GET / additionally accepts ?token=; the page strips it from the URL
+        immediately via history.replaceState."""
+        if self._token_ok():
             return True
         qs = parse_qs(urlparse(self.path).query).get("token", [""])[0]
-        return qs == AUTH_TOKEN
+        return hmac.compare_digest(qs, AUTH_TOKEN)
+
+    def _host_ok(self) -> bool:
+        raw = self.headers.get("Host", "")
+        host = raw.rsplit(":", 1)[0].strip("[]").lower() if raw else ""
+        return host in ALLOWED_HOSTS
 
     def do_GET(self):
+        if not self._host_ok():
+            self._json({"ok": False, "error": "bad host"}, 403)
+            return
         path = urlparse(self.path).path
         if path == "/health":
-            self._json({"ok": True, "version": VERSION})
+            self._json({"ok": True})
         elif path == "/status":
+            if not self._token_ok():
+                self._json({"ok": False, "error": "unauthorized"}, 401)
+                return
             self._json({
                 "ok": True, "version": VERSION,
                 "port": self.server.server_address[1],
@@ -614,7 +662,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "status": STATUS,
             })
         elif path == "/":
-            if not self._token_ok():
+            if not self._console_token_ok():
                 port = self.server.server_address[1]
                 body = (
                     b'<!doctype html><meta charset="utf-8">'
@@ -630,34 +678,25 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self.wfile.write(body)
                 return
             port = self.server.server_address[1]
-            if AUTH_TOKEN:
-                banner = (
-                    '<div style="margin:18px 24px 0;padding:11px 14px;border:1px solid var(--border);'
-                    'border-radius:12px;background:var(--green-soft);color:var(--green);font-size:13px;'
-                    'display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-                    '<b style="font-weight:700">Token required</b>'
-                    '<span style="color:var(--t2)">Safe for Tailscale / remote &middot; reachable on every interface at :'
-                    + str(port) + '.</span></div>'
-                )
-            else:
-                banner = (
-                    '<div style="margin:18px 24px 0;padding:11px 14px;border:1px solid #ECDCAB;'
-                    'border-radius:12px;background:#FBF4E0;color:#7A5E12;font-size:13px;'
-                    'display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-                    '<b style="font-weight:700">No token set</b>'
-                    '<span style="opacity:.85">Fine on your home LAN. For remote / Tailscale use, start with '
-                    '<code>--token</code> or set <code>WHISPERFLOW_TOKEN</code>.</span></div>'
-                )
+            banner = (
+                '<div style="margin:18px 24px 0;padding:11px 14px;border:1px solid var(--border);'
+                'border-radius:12px;background:var(--green-soft);color:var(--green);font-size:13px;'
+                'display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+                '<b style="font-weight:700">Token required</b>'
+                '<span style="color:var(--t2)">Safe for Tailscale / remote &middot; reachable on every interface at :'
+                + str(port) + '.</span></div>'
+            )
             lan = get_lan_ip()
             tail = get_tail_ip() or ""
+            wb_json = json.dumps({
+                "lan": lan, "tail": tail, "port": str(port), "token": AUTH_TOKEN or ""
+            })
             html = (
                 STATUS_PAGE
                 .replace("@@PORT@@", str(port))
                 .replace("@@VERSION@@", VERSION)
                 .replace("@@AUTH_BANNER@@", banner)
-                .replace("@@LAN_IP@@", lan)
-                .replace("@@TAIL_IP@@", tail)
-                .replace("@@PAIR_TOKEN@@", AUTH_TOKEN or "")
+                .replace("@@WB_JSON@@", wb_json)
                 .replace("@@QR_LIB@@", QR_LIB_JS)
                 .encode()
             )
@@ -670,16 +709,31 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": "not found"}, 404)
 
     def do_POST(self):
+        if not self._host_ok():
+            self._json({"ok": False, "error": "bad host"}, 403)
+            return
         path = urlparse(self.path).path
         if path != "/send":
             self._json({"ok": False, "error": "not found"}, 404)
+            return
+
+        ctype = self.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        if ctype != "application/json":
+            self._json({"ok": False, "error": "unsupported media type"}, 415)
             return
 
         if not self._token_ok():
             self._json({"ok": False, "error": "unauthorized"}, 401)
             return
 
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            self._json({"ok": False, "error": "bad content-length"}, 400)
+            return
+        if length < 0 or length > MAX_BODY:
+            self._json({"ok": False, "error": "payload too large"}, 413)
+            return
         raw = self.rfile.read(length)
 
         try:
@@ -701,7 +755,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         source = data.get("source", "unknown")
         ts = time.strftime("%H:%M:%S")
         preview = text[:80] + ("…" if len(text) > 80 else "") if text else "(enter)"
-        print(f"  ← [{ts}] ({source}/{mode}) {preview}")
+        if LOG_CONTENT:
+            print(f"  ← [{ts}] ({source}/{mode}) {preview}")
+        else:
+            print(f"  ← [{ts}] ({source}/{mode}) {len(text)} chars")
 
         enter_after = data.get("enter_after", False)
         ok = type_text(text, mode, enter_after=enter_after)
@@ -716,6 +773,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._json({"ok": ok, "chars": len(text), "mode": mode})
 
 
+class BridgeServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Whisper Flow Bridge — Mac Server")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Listen port")
@@ -725,15 +787,21 @@ def main():
     )
     parser.add_argument(
         "--token", default=None,
-        help="Shared secret for /send + console (or set WHISPERFLOW_TOKEN). Use for Tailscale/remote.",
+        help="Override the shared secret (falls back to env, ~/.config/whisperbridge/token, or auto-generate).",
     )
+    parser.add_argument(
+        "--allow-host", action="append", default=[],
+        help="Additional hostname to accept in Host header (repeatable).",
+    )
+    parser.add_argument("--log-content", action="store_true", help="Log dictation text to stdout (off by default).")
     parser.add_argument("--sound", default=None,
                         help="macOS system sound for the dictation chime (e.g. Tink, Pop, Glass). Default: Tink.")
     parser.add_argument("--no-sound", action="store_true", help="Disable the dictation chime.")
     args = parser.parse_args()
 
-    global AUTH_TOKEN, SOUND_ENABLED, SOUND_NAME
-    AUTH_TOKEN = args.token or os.environ.get("WHISPERFLOW_TOKEN") or None
+    global AUTH_TOKEN, SOUND_ENABLED, SOUND_NAME, LOG_CONTENT
+    AUTH_TOKEN = resolve_token(args.token)
+    LOG_CONTENT = args.log_content
     if args.no_sound or os.environ.get("WHISPERFLOW_NO_SOUND") == "1":
         SOUND_ENABLED = False
     _snd = args.sound or os.environ.get("WHISPERFLOW_SOUND")
@@ -743,22 +811,54 @@ def main():
     if args.clipboard_only:
         BridgeHandler.default_mode = "clipboard"
 
-    server = HTTPServer(("0.0.0.0", args.port), BridgeHandler)
+    lan = get_lan_ip()
+    tail = get_tail_ip()
+    hostname = socket.gethostname()
+
+    ALLOWED_HOSTS.clear()
+    for h in (hostname, f"{hostname}.local", "localhost", "127.0.0.1", "::1", "0.0.0.0", lan, tail):
+        if h:
+            ALLOWED_HOSTS.add(h.lower())
+    for h in args.allow_host:
+        if h:
+            ALLOWED_HOSTS.add(h.lower())
+
+    server = BridgeServer(("0.0.0.0", args.port), BridgeHandler)
+
+    # Check if token was freshly generated (file didn't exist before)
+    generated = not os.path.exists(TOKEN_FILE) or os.path.getsize(TOKEN_FILE) == 0
+    if generated and AUTH_TOKEN:
+        print(f"\n  ╔══════════════════════════════════════════════╗")
+        print(f"  ║  Token generated & saved to:                 ║")
+        print(f"  ║  {TOKEN_FILE:<44}║")
+        print(f"  ║  Token: {AUTH_TOKEN[:32]:<42}║")
+        print(f"  ╚══════════════════════════════════════════════╝\n")
+
     print(f"""
   ╔══════════════════════════════════════════════╗
   ║       Whisper Flow Bridge — Mac Server       ║
   ╠══════════════════════════════════════════════╣
   ║  Listening on 0.0.0.0:{args.port:<23}║
   ║  Mode: {"clipboard-only" if args.clipboard_only else "type (⌘V paste)":<37}║
-  ║  Auth: {("token (remote-safe)" if AUTH_TOKEN else "none (LAN ok)"):<38}║
-  ║  LAN : http://<lan-ip>:{args.port:<19}║
-  ║  Tail: http://<tailnet-ip>:{args.port:<15}║
+  ║  Auth: token (remote-safe){'':<20}║
+  ║  LAN : http://{lan}:{args.port:<19}║
+  ║  Tail: {f"http://{tail}:{args.port}" if tail else "not connected":<35}║
   ╚══════════════════════════════════════════════╝
 """)
-    if not AUTH_TOKEN:
-        print("  ⚠ No token set. Fine on home Wi‑Fi; before using Tailscale/remote,")
-        print("    re‑run with --token or export WHISPERFLOW_TOKEN.\n")
     print("  Waiting for text from Android…\n")
+
+    def _refresh_hosts():
+        while True:
+            time.sleep(15)
+            tail = get_tail_ip(force=True)
+            if tail:
+                ALLOWED_HOSTS.add(tail.lower())
+            lan = get_lan_ip()
+            if lan:
+                ALLOWED_HOSTS.add(lan.lower())
+
+    refresh_thread = threading.Thread(target=_refresh_hosts, daemon=True)
+    refresh_thread.start()
 
     try:
         server.serve_forever()
