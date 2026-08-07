@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.text.InputType
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -32,21 +33,18 @@ class MainActivity : AppCompatActivity() {
 
         ProfileManager.migrateIfNeeded(this)
         refreshProfileChips()
-        loadActiveProfile()
+        updateStatusView()
 
-        binding.btnSaveProfile.setOnClickListener { saveCurrentProfile() }
-        binding.btnConnect.setOnClickListener { testConnection() }
-        binding.btnScan.setOnClickListener { launchScan() }
+        binding.btnSettings.setOnClickListener { showSettingsDialog() }
         binding.btnSend.setOnClickListener { sendText("type") }
-        binding.btnClipboard.setOnClickListener { sendText("clipboard") }
         binding.btnEnter.setOnClickListener { sendEnter() }
+        binding.btnClipboard.setOnClickListener { sendText("clipboard") }
 
         binding.etText.setOnEditorActionListener { _, _, _ ->
             sendText("type")
             true
         }
 
-        updateStatus(null, false)
         handlePairIntent(intent)
     }
 
@@ -90,7 +88,6 @@ class MainActivity : AppCompatActivity() {
             row.addView(chip)
         }
 
-        // "+" add chip
         val addChip = MaterialButton(this).apply {
             text = "+"
             textSize = 18f
@@ -112,34 +109,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectProfile(index: Int) {
-        saveCurrentProfile()
         ProfileManager.setActiveIndex(this, index)
-        loadActiveProfile()
         refreshProfileChips()
-        updateStatus("Switched profile", false)
+        updateStatusView()
         vibrate()
-    }
-
-    private fun loadActiveProfile() {
-        val p = ProfileManager.getActive(this)
-        if (p != null) {
-            binding.etHost.setText(p.host)
-            binding.etPort.setText(p.port.toString())
-            binding.etToken.setText(p.token)
-        }
-    }
-
-    private fun saveCurrentProfile() {
-        val profiles = ProfileManager.getAll(this)
-        val idx = ProfileManager.getActiveIndex(this)
-        if (idx in profiles.indices) {
-            val updated = profiles[idx].copy(
-                host = binding.etHost.text.toString().trim(),
-                port = binding.etPort.text.toString().trim().toIntOrNull() ?: 9877,
-                token = binding.etToken.text.toString().trim()
-            )
-            ProfileManager.update(this, idx, updated)
-        }
     }
 
     private fun promptAddProfile() {
@@ -153,12 +126,9 @@ class MainActivity : AppCompatActivity() {
             .setView(input)
             .setPositiveButton("Create") { _, _ ->
                 val name = input.text.toString().trim().ifEmpty { "Mac" }
-                ProfileManager.add(
-                    this,
-                    ProfileManager.Profile(name, "", 9877, "")
-                )
+                ProfileManager.add(this, ProfileManager.Profile(name, "", 9877, ""))
                 refreshProfileChips()
-                loadActiveProfile()
+                updateStatusView()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -178,46 +148,181 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Delete") { _, _ ->
                 ProfileManager.remove(this, index)
                 refreshProfileChips()
-                loadActiveProfile()
+                updateStatusView()
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
+    // ── Settings dialog ──────────────────────────────────────────
+
+    private fun showSettingsDialog() {
+        val profile = ProfileManager.getActive(this)
+        val dialogView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 16)
+        }
+
+        val etHost = EditText(this).apply {
+            hint = "Mac IP address"
+            setText(profile?.host ?: "")
+            inputType = InputType.TYPE_TEXT_VARIATION_URI
+            setPadding(32, 28, 32, 28)
+            textSize = 15f
+            setBackgroundResource(R.drawable.bg_field_round)
+        }
+        dialogView.addView(etHost)
+
+        val etPort = EditText(this).apply {
+            hint = "Port (default 9877)"
+            setText((profile?.port ?: 9877).toString())
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setPadding(32, 28, 32, 28)
+            textSize = 15f
+            setBackgroundResource(R.drawable.bg_field_round)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 16 }
+        }
+        dialogView.addView(etPort)
+
+        val etToken = EditText(this).apply {
+            hint = "Token (leave empty on home Wi‑Fi)"
+            setText(profile?.token ?: "")
+            inputType = InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setPadding(32, 28, 32, 28)
+            textSize = 15f
+            setBackgroundResource(R.drawable.bg_field_round)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 16 }
+        }
+        dialogView.addView(etToken)
+
+        val buttonRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 20 }
+        }
+
+        val btnScan = MaterialButton(this).apply {
+            text = "Scan"
+            textSize = 13f
+            isAllCaps = false
+            setPadding(24, 0, 24, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                80
+            ).apply { marginEnd = 12 }
+            cornerRadius = 9999
+            strokeWidth = 1
+            strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_qr)
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            iconTint = ContextCompat.getColorStateList(this@MainActivity, R.color.accent)
+        }
+        buttonRow.addView(btnScan)
+
+        val btnTest = MaterialButton(this).apply {
+            text = "Test"
+            textSize = 13f
+            isAllCaps = false
+            setPadding(24, 0, 24, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                80
+            )
+            cornerRadius = 9999
+            strokeWidth = 1
+            strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+        }
+        buttonRow.addView(btnTest)
+
+        dialogView.addView(buttonRow)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Connection Settings")
+            .setView(dialogView)
+            .setPositiveButton("Save") { _, _ ->
+                val host = etHost.text.toString().trim()
+                val port = etPort.text.toString().trim().toIntOrNull() ?: 9877
+                val token = etToken.text.toString().trim()
+                val activeIdx = ProfileManager.getActiveIndex(this)
+                val profiles = ProfileManager.getAll(this)
+                if (activeIdx in profiles.indices) {
+                    val updated = profiles[activeIdx].copy(host = host, port = port, token = token)
+                    ProfileManager.update(this, activeIdx, updated)
+                }
+                refreshProfileChips()
+                updateStatusView()
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        btnScan.setOnClickListener {
+            dialog.dismiss()
+            launchScan()
+        }
+
+        btnTest.setOnClickListener {
+            btnTest.isEnabled = false
+            btnTest.text = "Testing…"
+            val host = etHost.text.toString().trim()
+            val port = etPort.text.toString().trim().toIntOrNull() ?: 9877
+            val token = etToken.text.toString().trim()
+
+            lifecycleScope.launch {
+                val result = if (token.isNotEmpty()) {
+                    BridgeClient.probe(host, port, token)
+                } else {
+                    BridgeClient.healthCheck(host, port)
+                }
+                btnTest.isEnabled = true
+                btnTest.text = if (result.ok) "✓ Connected" else "✗ Failed"
+                btnTest.postDelayed({ btnTest.text = "Test" }, 2000)
+            }
+        }
+
+        dialog.show()
+    }
+
     // ── Connection helpers ───────────────────────────────────────
 
-    private fun hostPort(): Pair<String, Int>? {
-        val host = binding.etHost.text.toString().trim()
-        val port = binding.etPort.text.toString().trim().toIntOrNull() ?: 9877
+    private fun activeHostPort(): Pair<String, Int>? {
+        val profile = ProfileManager.getActive(this) ?: return null
+        val host = profile.host
         if (host.isEmpty()) {
-            Toast.makeText(this, "Enter your Mac's IP address", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "No host configured — tap the gear icon", Toast.LENGTH_LONG).show()
             return null
         }
-        return host to port
+        return host to profile.port
     }
 
-    private fun token(): String = binding.etToken.text.toString().trim()
+    private fun activeToken(): String = ProfileManager.getActive(this)?.token ?: ""
 
-    private fun testConnection() {
-        val (host, port) = hostPort() ?: return
-        binding.btnConnect.isEnabled = false
-        binding.statusDot.visibility = View.VISIBLE
-        binding.statusText.text = "Connecting…"
-
-        lifecycleScope.launch {
-            val tok = token()
-            val result = if (tok.isNotEmpty()) {
-                BridgeClient.probe(host, port, tok)
-            } else {
-                BridgeClient.healthCheck(host, port)
-            }
-            binding.btnConnect.isEnabled = true
-            updateStatus(result.message, result.ok)
-        }
+    private fun updateStatusView() {
+        val profile = ProfileManager.getActive(this)
+        val configured = profile != null && profile.host.isNotEmpty()
+        binding.statusText.text = if (configured)
+            "${profile!!.name} · ${profile.host}"
+        else
+            "Not connected"
+        val color = if (configured) R.color.status_ok else R.color.status_idle
+        binding.statusDot.setColorFilter(ContextCompat.getColor(this, color))
     }
+
+    // ── Send actions ─────────────────────────────────────────────
 
     private fun sendText(mode: String) {
-        val (host, port) = hostPort() ?: return
+        val (host, port) = activeHostPort() ?: return
         val text = binding.etText.text.toString()
         if (text.isBlank()) {
             Toast.makeText(this, "Nothing to send", Toast.LENGTH_SHORT).show()
@@ -228,7 +333,10 @@ class MainActivity : AppCompatActivity() {
         binding.btnClipboard.isEnabled = false
 
         lifecycleScope.launch {
-            val result = BridgeClient.sendText(host, port, text, mode, "android-main", token(), enterAfter = binding.cbEnterAfter.isChecked)
+            val result = BridgeClient.sendText(
+                host, port, text, mode, "android-main", activeToken(),
+                enterAfter = binding.cbEnterAfter.isChecked
+            )
             binding.btnSend.isEnabled = true
             binding.btnClipboard.isEnabled = true
 
@@ -236,48 +344,33 @@ class MainActivity : AppCompatActivity() {
                 vibrate()
                 binding.etText.text?.clear()
                 val label = if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
-                binding.statusText.text = label
-                binding.statusDot.setColorFilter(
-                    ContextCompat.getColor(this@MainActivity, R.color.status_ok)
-                )
+                Toast.makeText(this@MainActivity, label, Toast.LENGTH_SHORT).show()
             } else {
-                binding.statusText.text = "Failed: ${result.message}"
-                binding.statusDot.setColorFilter(
-                    ContextCompat.getColor(this@MainActivity, R.color.status_err)
-                )
+                Toast.makeText(this@MainActivity, "Failed: ${result.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun sendEnter() {
-        val (host, port) = hostPort() ?: return
+        val (host, port) = activeHostPort() ?: return
+
         binding.btnEnter.isEnabled = false
         lifecycleScope.launch {
             val result = BridgeClient.sendText(
-                host, port, " ", "enter", "android-main", token(),
+                host, port, " ", "enter", "android-main", activeToken(),
                 enterAfter = false
             )
             binding.btnEnter.isEnabled = true
             if (result.ok) {
                 vibrate()
-                binding.statusText.text = "Return key sent"
-                binding.statusDot.setColorFilter(
-                    ContextCompat.getColor(this@MainActivity, R.color.status_ok)
-                )
+                Toast.makeText(this@MainActivity, "Return key sent", Toast.LENGTH_SHORT).show()
             } else {
-                binding.statusText.text = "Failed: ${result.message}"
-                binding.statusDot.setColorFilter(
-                    ContextCompat.getColor(this@MainActivity, R.color.status_err)
-                )
+                Toast.makeText(this@MainActivity, "Failed: ${result.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun updateStatus(message: String?, connected: Boolean) {
-        binding.statusText.text = message ?: "Not connected"
-        val color = if (connected) R.color.status_ok else R.color.status_idle
-        binding.statusDot.setColorFilter(ContextCompat.getColor(this, color))
-    }
+    // ── Scan / Pairing ───────────────────────────────────────────
 
     private fun launchScan() {
         startActivityForResult(Intent(this, ScanActivity::class.java), scanReq)
@@ -286,9 +379,8 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == scanReq && resultCode == RESULT_OK) {
-            loadActiveProfile()
             refreshProfileChips()
-            updateStatus("Paired via QR", true)
+            updateStatusView()
             vibrate()
         }
     }
@@ -305,13 +397,9 @@ class MainActivity : AppCompatActivity() {
         val parsed = Pairing.parse(data.toString()) ?: return
 
         val name = if (parsed.host.contains("100.")) "Tailscale" else "Mac"
-        ProfileManager.add(
-            this,
-            ProfileManager.Profile(name, parsed.host, parsed.port, parsed.token)
-        )
+        ProfileManager.add(this, ProfileManager.Profile(name, parsed.host, parsed.port, parsed.token))
         refreshProfileChips()
-        loadActiveProfile()
-        updateStatus("Paired via link", true)
+        updateStatusView()
         vibrate()
     }
 
