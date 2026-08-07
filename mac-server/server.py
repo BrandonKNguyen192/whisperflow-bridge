@@ -75,14 +75,15 @@ try:
 except Exception:
     QR_LIB_JS = ""
 
-# ── Text injection ──────────────────────────────────────────────────────────
 
-def type_text(text: str, mode: str = "type") -> bool:
+def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
     """Inject text into the active application.
 
     mode="type"      → copy to clipboard, then simulate ⌘V
     mode="clipboard" → copy to clipboard only
     mode="append"    → append to clipboard (with newline separator)
+
+    enter_after      → simulate Return/Enter after paste (for "type" mode)
     """
     try:
         if mode == "append":
@@ -107,11 +108,22 @@ def type_text(text: str, mode: str = "type") -> bool:
             ],
             check=True,
         )
+
+        # Simulate Enter if requested
+        if enter_after:
+            time.sleep(0.08)
+            subprocess.run(
+                [
+                    "osascript", "-e",
+                    'tell application "System Events" to keystroke return',
+                ],
+                check=True,
+            )
+
         return True
     except subprocess.CalledProcessError as exc:
         print(f"  ✗ Failed to inject text: {exc}")
         return False
-
 
 def notify(title: str, message: str):
     """Show a macOS notification (best-effort)."""
@@ -662,7 +674,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         preview = text[:80] + ("…" if len(text) > 80 else "")
         print(f"  ← [{ts}] ({source}/{mode}) {preview}")
 
-        ok = type_text(text, mode)
+        enter_after = data.get("enter_after", False)
+        ok = type_text(text, mode, enter_after=enter_after)
         if ok:
             notify("Whisper Bridge", f"Received {len(text)} chars")
             chime()

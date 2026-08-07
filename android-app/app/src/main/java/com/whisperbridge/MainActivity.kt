@@ -227,7 +227,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnClipboard.isEnabled = false
 
         lifecycleScope.launch {
-            val result = BridgeClient.sendText(host, port, text, mode, "android-main", token())
+            val result = BridgeClient.sendText(host, port, text, mode, "android-main", token(), enterAfter = binding.cbEnterAfter.isChecked)
             binding.btnSend.isEnabled = true
             binding.btnClipboard.isEnabled = true
 

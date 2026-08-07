@@ -23,7 +23,8 @@ object BridgeClient {
         text: String,
         mode: String = "type",
         source: String = "android",
-        token: String = ""
+        token: String = "",
+        enterAfter: Boolean = false,
     ): Result = withContext(Dispatchers.IO) {
         try {
             val url = URL("http://$host:$port/send")
@@ -39,6 +40,7 @@ object BridgeClient {
                 put("text", text)
                 put("mode", mode)
                 put("source", source)
+                put("enter_after", enterAfter)
             }
 
             conn.outputStream.use { os ->

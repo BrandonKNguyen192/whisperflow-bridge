@@ -74,7 +74,8 @@ class ShareReceiverActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val result = BridgeClient.sendText(
-                profile.host, profile.port, sharedText, mode, "whisperflow-share", profile.token
+                profile.host, profile.port, sharedText, mode, "whisperflow-share", profile.token,
+                enterAfter = binding.cbEnterAfter.isChecked
             )
             binding.progress.visibility = View.GONE
             if (result.ok) {

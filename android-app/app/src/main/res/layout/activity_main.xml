@@ -317,6 +317,17 @@
                         app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
                         app:strokeColor="@color/border" />
                 </LinearLayout>
+
+                <CheckBox
+                    android:id="@+id/cbEnterAfter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="Press Enter after typing"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:buttonTint="@color/accent"
+                    android:minHeight="36dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

@@ -102,10 +102,21 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
+            <CheckBox
+                android:id="@+id/cbEnterAfter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Press Enter after typing"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:buttonTint="@color/accent"
+                android:minHeight="36dp" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
