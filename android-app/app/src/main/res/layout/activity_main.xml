@@ -292,13 +292,30 @@
                         android:layout_height="50dp"
                         android:layout_weight="1"
                         android:text="Type on Mac"
-                        android:textSize="15sp"
+                        android:textSize="14sp"
                         app:backgroundTint="@color/accent"
                         app:cornerRadius="999dp"
                         app:icon="@drawable/ic_send"
                         app:iconGravity="textStart"
                         app:iconTint="@android:color/white"
                         app:shapeAppearanceOverlay="@style/ShapeKomodosPill" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnEnter"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="50dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="Enter"
+                        android:textColor="@color/accent"
+                        android:textSize="14sp"
+                        app:cornerRadius="999dp"
+                        app:icon="@drawable/ic_check"
+                        app:iconGravity="textStart"
+                        app:iconTint="@color/accent"
+                        app:shapeAppearanceOverlay="@style/ShapeKomodosPill"
+                        app:strokeColor="@color/accent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnClipboard"
@@ -309,7 +326,7 @@
                         android:layout_weight="1"
                         android:text="Clipboard"
                         android:textColor="@color/text_primary"
-                        android:textSize="15sp"
+                        android:textSize="14sp"
                         app:cornerRadius="999dp"
                         app:icon="@drawable/ic_clipboard"
                         app:iconGravity="textStart"

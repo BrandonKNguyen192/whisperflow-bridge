@@ -46,6 +46,7 @@ class ShareReceiverActivity : AppCompatActivity() {
         binding.btnSend.setOnClickListener { forward("type") }
         binding.btnClipboard.setOnClickListener { forward("clipboard") }
         binding.btnDismiss.setOnClickListener { finish() }
+        binding.btnEnter.setOnClickListener { forward("enter") }
 
         // Auto-send if a host is configured
         val profile = ProfileManager.getActive(this)

@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnScan.setOnClickListener { launchScan() }
         binding.btnSend.setOnClickListener { sendText("type") }
         binding.btnClipboard.setOnClickListener { sendText("clipboard") }
+        binding.btnEnter.setOnClickListener { sendEnter() }
 
         binding.etText.setOnEditorActionListener { _, _, _ ->
             sendText("type")
@@ -236,6 +237,30 @@ class MainActivity : AppCompatActivity() {
                 binding.etText.text?.clear()
                 val label = if (mode == "clipboard") "Copied to Mac clipboard" else "Typed on Mac"
                 binding.statusText.text = label
+                binding.statusDot.setColorFilter(
+                    ContextCompat.getColor(this@MainActivity, R.color.status_ok)
+                )
+            } else {
+                binding.statusText.text = "Failed: ${result.message}"
+                binding.statusDot.setColorFilter(
+                    ContextCompat.getColor(this@MainActivity, R.color.status_err)
+                )
+            }
+        }
+    }
+
+    private fun sendEnter() {
+        val (host, port) = hostPort() ?: return
+        binding.btnEnter.isEnabled = false
+        lifecycleScope.launch {
+            val result = BridgeClient.sendText(
+                host, port, " ", "enter", "android-main", token(),
+                enterAfter = false
+            )
+            binding.btnEnter.isEnabled = true
+            if (result.ok) {
+                vibrate()
+                binding.statusText.text = "Return key sent"
                 binding.statusDot.setColorFilter(
                     ContextCompat.getColor(this@MainActivity, R.color.status_ok)
                 )

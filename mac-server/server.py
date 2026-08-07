@@ -94,6 +94,18 @@ def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
             subprocess.run(["pbcopy"], input=combined.encode(), check=True)
             return True
 
+        # Mode 'enter': just fire a Return keystroke, no text
+        if mode == "enter":
+            time.sleep(0.05)
+            subprocess.run(
+                [
+                    "osascript", "-e",
+                    'tell application "System Events" to keystroke return',
+                ],
+                check=True,
+            )
+            return True
+
         subprocess.run(["pbcopy"], input=text.encode(), check=True)
 
         if mode == "clipboard":
@@ -677,26 +689,27 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         text = data.get("text", "").strip()
-        if not text:
+
+        mode = data.get("mode", self.default_mode)
+        if mode not in ("type", "clipboard", "append", "enter"):
+            mode = "type"
+
+        if mode != "enter" and not text:
             self._json({"ok": False, "error": "empty text"}, 400)
             return
 
-        mode = data.get("mode", self.default_mode)
-        if mode not in ("type", "clipboard", "append"):
-            mode = "type"
-
         source = data.get("source", "unknown")
         ts = time.strftime("%H:%M:%S")
-        preview = text[:80] + ("…" if len(text) > 80 else "")
+        preview = text[:80] + ("…" if len(text) > 80 else "") if text else "(enter)"
         print(f"  ← [{ts}] ({source}/{mode}) {preview}")
 
         enter_after = data.get("enter_after", False)
         ok = type_text(text, mode, enter_after=enter_after)
         if ok:
-            notify("Whisper Bridge", f"Received {len(text)} chars")
+            notify("Whisper Bridge", f"Received {len(text)} chars" if text else "Return key pressed")
             chime()
             STATUS["count"] += 1
-            STATUS["last_preview"] = text[:60] + ("…" if len(text) > 60 else "")
+            STATUS["last_preview"] = text[:60] + ("…" if len(text) > 60 else "") if text else "(enter)"
             STATUS["last_source"] = source
             STATUS["last_mode"] = mode
             STATUS["last_ts"] = ts
