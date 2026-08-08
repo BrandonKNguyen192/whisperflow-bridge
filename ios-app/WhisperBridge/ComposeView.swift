@@ -157,7 +157,10 @@ struct ComposeView: View {
                     .glassEffect(.regular.interactive(), in: Circle())
                     .glassEffectID("add", in: chipGlass)
                 }
-                .padding(.vertical, 2)
+                // Room for the active chip's 1.04x pop on both ends so the
+                // first pill never gets clipped by the scroll view edge.
+                .padding(.vertical, 3)
+                .padding(.horizontal, 6)
             }
         }
     }
