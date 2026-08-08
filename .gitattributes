@@ -1,0 +1,2 @@
+# Generated PDF exports contain binary image and stream data.
+output/pdf/*.pdf binary

@@ -19,6 +19,7 @@ Before you begin, install these three pieces:
 Then install the desktop receiver using `mac-server/install.command`, `ubuntu-server/install.sh`, or `windows-server/install.ps1`, open `http://localhost:9877`, and scan its Tailscale pairing QR from Whisper Bridge settings. Share transcribed text from Wispr Flow to Whisper Bridge, choose the destination profile, and tap **Type**.
 
 For the complete first-time setup, see [Getting Started](documentation/getting-started.md).
+Prefer a printable guide? Download the [Android setup walkthrough (PDF)](output/pdf/whisper-bridge-android-walkthrough.pdf).
 
 An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.md`).
 
