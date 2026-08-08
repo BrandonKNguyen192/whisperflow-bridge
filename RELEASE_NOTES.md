@@ -1,3 +1,37 @@
+# Whisper Bridge - v1.2.0
+
+Whisper Bridge lets you dictate with Wispr Flow on Android and send the result to a computer on your local network or through Tailscale. This is an independent, unofficial companion project and is not affiliated with or endorsed by Wispr.
+
+## New Features
+
+- **Mouse control from your phone:** A Mac trackpad view moves and clicks the cursor remotely, plus an air-mouse mode that steers the cursor by tilting the phone.
+- **Earth theme:** A warm earth palette joins Light, Pure OLED Black, and System modes, with any RGB accent color.
+- **Material 3 motion:** Press, entrance, and breathing micro-interactions across the Android app.
+- **iOS/iPadOS client (preview):** A SwiftUI client in `ios-app/` with typing, clipboard, Enter, pairing, and the same theme system. Source ships in the repo while it finishes beta.
+- **Branded setup guide:** A printable PDF walkthrough plus expanded first-time setup docs.
+
+## Improvements
+
+- **Cleaner Android UI:** Centered labels, aligned icon rows, and consistent Material sizing across every screen.
+- **Sharper pairing:** Tailscale CGNAT hosts are labeled correctly, deep-link pairing asks for confirmation before saving, and the share sheet sends nothing until you tap.
+- **Stronger receivers:** Ubuntu and Windows backends gained more robust input paths and installers.
+
+## Bug Fixes
+
+- Fixed the Enter/Return button that could fail with HTTP 400 against the Mac receiver.
+- Fixed narrow Android action buttons that wrapped labels one character per line.
+
+## Upgrade Note
+
+- Existing v1.1.0 installs upgrade normally; both versions use the project's permanent signing key. Users still on the v1.0.0 debug-signed APK must uninstall once before installing v1.2.0.
+
+## Platform Status
+
+- Android and macOS: release candidate, verified locally.
+- Ubuntu: beta; automated backend tests pass, a real-desktop smoke test is still recommended.
+- Windows: preview; automated tests pass, a real-PC smoke test is still recommended.
+- iOS/iPadOS: preview; source builds and runs on device, not yet wired into the automated release pipeline.
+
 # Whisper Bridge - v1.1.0
 
 Whisper Bridge lets you dictate with Wispr Flow on Android and send the result to a computer on your local network or through Tailscale. This is an independent, unofficial companion project and is not affiliated with or endorsed by Wispr.
