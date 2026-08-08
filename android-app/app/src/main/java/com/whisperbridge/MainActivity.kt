@@ -233,26 +233,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         val addChip = MaterialButton(this).apply {
-            text = "+"
-            textSize = 20f
-            isAllCaps = false
-            typeface = Typeface.DEFAULT_BOLD
+            contentDescription = "Add computer"
             gravity = Gravity.CENTER
             textAlignment = View.TEXT_ALIGNMENT_CENTER
             insetTop = 0
             insetBottom = 0
-            setPadding(26, 0, 26, 0)
+            setPadding(0, 0, 0, 0)
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                60,
                 60
             )
-            // The "+" glyph sits a hair low inside its pill due to font metrics.
-            translationY = -1.5f * resources.displayMetrics.density
             cornerRadius = 9999
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
-            setTextColor(accent)
+            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_add)
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            iconSize = 24
+            iconPadding = 0
+            iconTint = ColorStateList.valueOf(accent)
             setOnClickListener { promptAddProfile() }
         }
         row.addView(addChip)
