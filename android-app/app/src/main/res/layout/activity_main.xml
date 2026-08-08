@@ -300,12 +300,14 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnMouseDrag"
-                        style="@style/WB.TextButton"
+                        style="@style/WB.IconTopOutlined"
                         android:layout_width="0dp"
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:text="Drag"
                         android:textColor="@color/text_primary"
+                        app:icon="@drawable/ic_drag"
+                        app:iconTint="@color/text_primary"
                         app:strokeColor="@color/border" />
 
                     <com.google.android.material.button.MaterialButton

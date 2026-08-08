@@ -224,6 +224,8 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 60
             )
+            // The "+" glyph sits a hair low inside its pill due to font metrics.
+            translationY = -1.5f * resources.displayMetrics.density
             cornerRadius = 9999
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
