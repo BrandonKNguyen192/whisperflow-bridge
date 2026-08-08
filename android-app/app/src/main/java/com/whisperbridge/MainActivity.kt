@@ -181,6 +181,7 @@ class MainActivity : AppCompatActivity() {
                 isAllCaps = false
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
+                textAlignment = View.TEXT_ALIGNMENT_CENTER
                 insetTop = 0
                 insetBottom = 0
                 setPadding(32, 0, 32, 0)
@@ -215,6 +216,7 @@ class MainActivity : AppCompatActivity() {
             isAllCaps = false
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
             insetTop = 0
             insetBottom = 0
             setPadding(26, 0, 26, 0)
@@ -364,6 +366,9 @@ class MainActivity : AppCompatActivity() {
             textSize = 13f
             isAllCaps = false
             setPadding(24, 0, 24, 0)
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 56
@@ -384,6 +389,9 @@ class MainActivity : AppCompatActivity() {
             textSize = 13f
             isAllCaps = false
             setPadding(24, 0, 24, 0)
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 56
@@ -460,6 +468,8 @@ class MainActivity : AppCompatActivity() {
                 isAllCaps = false
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(18, 0, 18, 0)
+                gravity = Gravity.CENTER
+                textAlignment = View.TEXT_ALIGNMENT_CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     52
@@ -572,6 +582,9 @@ class MainActivity : AppCompatActivity() {
             minWidth = 0
             cornerRadius = 12
             strokeWidth = 1
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            typeface = Typeface.DEFAULT_BOLD
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
             setTextColor(accent)
