@@ -1,0 +1,89 @@
+name: WhisperBridge
+
+options:
+  bundleIdPrefix: com.whisperbridge
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: "3GKZY82PF6"
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.1.0"
+
+targets:
+  WhisperBridgeCore:
+    type: framework
+    platform: iOS
+    sources:
+      - WhisperBridgeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whisperbridge.core
+        GENERATE_INFOPLIST_FILE: YES
+
+  WhisperBridge:
+    type: application
+    platform: iOS
+    sources:
+      - WhisperBridge
+    dependencies:
+      - target: WhisperBridgeCore
+    info:
+      path: WhisperBridge/Info.plist
+      properties:
+        CFBundleDisplayName: Whisper Bridge
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSLocalNetworkUsageDescription: Whisper Bridge connects to your computer over your local network or Tailscale to type on it.
+        NSCameraUsageDescription: Used to scan the pairing QR code shown by your computer's receiver console.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whisperbridge.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+
+  WhisperBridgeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - WhisperBridgeTests
+    dependencies:
+      - target: WhisperBridge
+      - target: WhisperBridgeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whisperbridge.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WhisperBridge.app/WhisperBridge"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  WhisperBridge:
+    build:
+      targets:
+        WhisperBridge: all
+        WhisperBridgeCore: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - WhisperBridgeTests

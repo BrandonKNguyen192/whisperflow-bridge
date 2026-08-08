@@ -25,6 +25,15 @@ The keystore is the permanent update identity. Never commit it, email it, regene
 6. The tag workflow signs Android with GitHub secrets and publishes Android, Mac, Ubuntu, and Windows assets.
 7. Install the published APK over the prior release on a real phone before announcing broadly.
 
+## Public Documentation Checklist
+
+- Confirm the README screenshots render on GitHub; replace or add platform
+  screenshots under `documentation/screenshots/` as the UI changes.
+- Keep the how-to guide in sync with the receiver console, Android share flow,
+  Tailscale pairing, and the iOS app once it ships.
+- Update `PRIVACY.md` and `SECURITY.md` whenever a platform or data path changes.
+- Add or refresh release notes in `RELEASE_NOTES.md` before tagging.
+
 ## Recovery
 
 If the local keystore is lost, GitHub Actions can continue signing while its secrets remain configured, but those secrets cannot be downloaded as a backup. Restore the encrypted offline keystore copy as soon as possible. If both are lost, existing installations cannot accept a normal update signed by a new key.

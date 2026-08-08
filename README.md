@@ -10,10 +10,28 @@ The desktop receiver supports macOS, Ubuntu, and Windows. See [Privacy](PRIVACY.
 
 ## Quick Start
 
-1. Download the signed Android APK and your computer's ZIP from [Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases).
-2. Install the desktop receiver using `mac-server/install.command`, `ubuntu-server/install.sh`, or `windows-server/install.ps1`.
-3. Open the local console at `http://localhost:9877` and scan its pairing QR from Android settings.
-4. Share text from Wispr Flow to Whisper Bridge, choose the destination profile, and tap **Type**.
+Before you begin, install these three pieces:
+
+1. [Wispr Flow for Android](https://wisprflow.ai/) for voice dictation.
+2. [Tailscale for Android](https://tailscale.com/download/android) and [Tailscale for your computer](https://tailscale.com/download) for secure remote use. Sign in to the same tailnet on both devices.
+3. Whisper Bridge: download the signed Android APK and your computer's ZIP from [Releases](https://github.com/BrandonKNguyen192/whisperflow-bridge/releases).
+
+Then install the desktop receiver using `mac-server/install.command`, `ubuntu-server/install.sh`, or `windows-server/install.ps1`, open `http://localhost:9877`, and scan its Tailscale pairing QR from Whisper Bridge settings. Share transcribed text from Wispr Flow to Whisper Bridge, choose the destination profile, and tap **Type**.
+
+For the complete first-time setup, see [Getting Started](documentation/getting-started.md).
+Prefer a printable guide? Download the [Android setup walkthrough (PDF)](output/pdf/whisper-bridge-android-walkthrough.pdf).
+
+An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.md`).
+
+## Screenshots
+
+| iPhone / iPad app | |
+| --- | --- |
+| Light | ![iOS light](documentation/screenshots/ios-main-light.png) |
+| Dark OLED | ![iOS dark OLED](documentation/screenshots/ios-main-dark-oled.png) |
+| Earth | ![iOS earth](documentation/screenshots/ios-main-earth.png) |
+| Settings · Earth | ![iOS settings earth](documentation/screenshots/ios-settings-earth.png) |
+| Settings · Dark OLED | ![iOS settings dark OLED](documentation/screenshots/ios-settings-dark-oled.png) |
 
 ```
 ┌──────────────┐   WiFi / LAN / Tailscale   ┌──────────────┐
@@ -81,6 +99,10 @@ shasum -a 256 app-release.apk
 
 **To build from source:** Open the `android-app/` folder in Android Studio, sync Gradle, and Run. Requires JDK 17 and SDK 34.
 
+**Also install the companion apps:**
+- [Wispr Flow for Android](https://wisprflow.ai/) transcribes your voice; sign in and complete its onboarding before using the share sheet.
+- [Tailscale for Android](https://tailscale.com/download/android) is recommended for every remote connection. Install [Tailscale on the computer](https://tailscale.com/download) too, then sign in to the same tailnet on both devices.
+
 **First launch:** Open Whisper Bridge → tap the gear → scan the receiver QR, or enter its details:
 - **Host:** the computer's LAN or Tailscale IP
 - **Port:** `9877` (default)
@@ -132,7 +154,7 @@ Tap the profile chips at the top to switch between computers. Long-press to dele
 
 The same receiver works away from home without port forwarding.
 
-1. Install **Tailscale** on the computer and Android phone; sign in with the same account.
+1. Install [Tailscale for Android](https://tailscale.com/download/android) on the phone and [Tailscale for your computer](https://tailscale.com/download); sign in to the same account (or tailnet) on both.
 2. Open the local receiver console and select the Tailscale QR.
 3. Scan it from Android settings. A unique token gates `/send` and the web console.
 4. In the app, put the tailnet address in **Host** and the same secret in **Token**, then tap **Test** — it verifies the token too.
