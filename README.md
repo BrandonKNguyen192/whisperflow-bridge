@@ -70,7 +70,7 @@ An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.m
 
 **Ubuntu:** extract the Ubuntu ZIP and run `./ubuntu-server/install.sh`. It installs the Wayland/X11 input helpers and creates a user-level systemd service.
 
-**Windows:** extract the Windows ZIP and run `windows-server\install.ps1` from PowerShell. Python 3 is required; allow Python through Windows Firewall only on Private networks.
+**Windows:** extract the Windows ZIP and run `windows-server\install.ps1` from PowerShell. Python 3.12+ is required; allow Python through Windows Firewall only on Private networks. The receiver injects input in-process (no console windows) and starts at sign-in.
 
 Then open **http://localhost:9877** in a browser to pair the Android app.
 
@@ -198,7 +198,7 @@ Whisperflow Bridge/               ← this repo
 │   ├── overlay.py             # Floating status pill (tkinter)
 │   └── menubar.py             # Menu-bar app + login item (needs `rumps`)
 ├── ubuntu-server/             # Wayland/X11 backend and systemd installer
-├── windows-server/            # PowerShell/SendKeys backend and startup installer
+├── windows-server/            # In-process Win32 SendInput backend and startup installer
 ├── android-app/               # Android Studio project
 │   ├── app/src/main/java/com/whisperbridge/
 │   │   ├── MainActivity.kt           # Multi-profile UI + settings + theme picker

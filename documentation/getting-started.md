@@ -50,9 +50,12 @@ private to your tailnet.
 3. On the computer, install the receiver:
    - **macOS:** double-click `mac-server/install.command`.
    - **Ubuntu:** run `./ubuntu-server/install.sh`.
-   - **Windows:** run `windows-server\\install.ps1` from PowerShell.
+   - **Windows:** install Python 3.12+ (`winget install --id Python.Python.3.12 -e --scope machine`), then run `windows-server\\install.ps1` from PowerShell.
 4. Keep the receiver running. On macOS, approve the requested Accessibility
-   permission so it can paste into the focused text field.
+   permission so it can paste into the focused text field. On Windows, the
+   receiver injects input in-process — you will not see any console windows
+   (if PowerShell windows flash when you type, the installed copy is older
+   than v1.3.0; reinstall the latest ZIP).
 
 ## 4. Pair The Phone And Computer
 

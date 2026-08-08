@@ -1,3 +1,31 @@
+# Whisper Bridge - v1.3.0
+
+Whisper Bridge lets you dictate with Wispr Flow on Android and send the result to a computer on your local network or through Tailscale. This is an independent, unofficial companion project and is not affiliated with or endorsed by Wispr.
+
+## New Features
+
+- **iOS air mouse:** Hold-to-activate gyroscope mouse on the iPhone/iPad client — tilt the phone to steer the cursor, with sensitivity and direction-invert settings. Mirrors the Android air mouse.
+- **iPhone 17 Pro Max verified end-to-end:** The iOS client now works on current iOS betas (27) over Tailscale and the home LAN, including live typing, mouse control, and pairing.
+
+## Improvements
+
+- **Windows receiver rewritten around in-process Win32 input.** The old backend spawned a visible PowerShell window for every keystroke and mouse event — a console flash storm that stole focus from the target app and blocked pasting. The new backend injects text via clipboard + Ctrl+V and mouse via `SendInput`, all inside the server process: zero console windows, focus never moves, and typed text lands verbatim (fixes mangled output like repeated characters).
+- **iOS transport bypasses ATS.** The iOS client now speaks HTTP/1.0 over a raw TCP socket (Network.framework) instead of URLSession. App Transport Security on current iOS betas rejects plain HTTP to Tailscale/LAN IPs even with exceptions set; raw sockets are not policed by ATS, so the receiver's plain-HTTP design keeps working everywhere.
+- **Verified on physical hardware:** Python 3.12 + the receiver were installed on a Windows mini-PC (Beelink) over Tailscale SSH; a live Notepad round-trip test confirmed typing lands exactly, and the Windows backend unit suite (10 tests) passes on the machine.
+
+## Bug Fixes
+
+- Fixed Windows clipboard calls (64-bit handle truncation) that crashed typing requests.
+- Fixed iOS ATS failures on iOS 27 beta (`NSURLError -1022`) for Tailscale CGNAT addresses.
+- Fixed the iOS profile chip being clipped by the scroll-view edge.
+
+## Platform Status
+
+- Android and macOS: release candidate, verified locally.
+- Windows: **verified live on a Beelink mini-PC** — typing, clipboard, and mouse control confirmed against real hardware over Tailscale; starts at sign-in via a scheduled task.
+- Ubuntu: beta; automated backend tests pass, a real-desktop smoke test is still recommended.
+- iOS/iPadOS: preview; source builds and runs on device (iPhone 17 Pro Max, iOS 27 beta), not yet wired into the automated release pipeline.
+
 # Whisper Bridge - v1.2.0
 
 Whisper Bridge lets you dictate with Wispr Flow on Android and send the result to a computer on your local network or through Tailscale. This is an independent, unofficial companion project and is not affiliated with or endorsed by Wispr.

@@ -122,17 +122,28 @@ add a `ios-app/README.md` with build/signing steps.
 
 ## Phases
 
-1. **Core app** — scaffold, compose view (Type/Enter/Clipboard/Append,
+1. **Core app** — ✅ shipped. Compose view (Type/Enter/Clipboard/Append,
    enter-after-type), manual profile entry + Test, QR pairing, themes + accent
-   picker, Local Network/ATS config, Keychain + App Group storage.
+   picker, Keychain + App Group storage, Liquid Glass surfaces and ambient
+   backdrop, spring motion tokens, haptics.
 2. **Voice** — share extension with confirm preview; in-app `SFSpeechRecognizer`
    dictation button; status feedback for all three paths.
-3. **Mouse** — glass trackpad with capture/release, scroll, clicks, drag; air
-   mouse via CoreMotion; sensitivity settings.
-4. **iPad** — split view, multi-window, landscape rail, Stage Manager pass.
-5. **Polish + release** — Liquid Glass pass across surfaces, empty/error states,
-   haptics, accessibility (VoiceOver labels, dynamic type), then TestFlight →
-   App Store. Update `PRIVACY.md`/`README.md` and the public release notes.
+3. **Mouse** — ✅ shipped. Glass trackpad with capture/release, scroll, clicks,
+   drag, finger-following glow; **air mouse via CoreMotion gyroscope**
+   (hold-to-activate, sensitivity + invert settings in the settings sheet);
+   haptics throughout.
+4. **iPad** — split view shipped; multi-window, landscape rail, Stage Manager
+   pass remain.
+5. **Polish + release** — ✅ shipped: Liquid Glass pass across surfaces,
+   empty/error states, haptics, motion system. Remaining: accessibility pass
+   (VoiceOver labels, dynamic type), then TestFlight → App Store. Update
+   `PRIVACY.md`/`README.md` and the public release notes.
+
+Transport note (v1.3.0): the client talks HTTP/1.0 over a raw `NWConnection`
+socket instead of URLSession. Current iOS betas reject plain HTTP to
+Tailscale/LAN IPs with `NSURLError -1022` even with ATS exceptions set;
+raw sockets are not policed by ATS, so the receiver's plain-HTTP design keeps
+working. Verified on an iPhone 17 Pro Max running iOS 27 beta.
 
 Each phase is verifiable against the real receiver with `test_server.py`'s
 endpoints and a local `curl` smoke test before any UI work.
