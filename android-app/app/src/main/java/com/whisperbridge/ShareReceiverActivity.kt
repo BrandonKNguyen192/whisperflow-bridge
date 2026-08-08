@@ -29,6 +29,7 @@ class ShareReceiverActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         applyAccentToView(binding.root)
+        ThemeManager.applyEarthPalette(binding.root)
 
         sharedText = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""

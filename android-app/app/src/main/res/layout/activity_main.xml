@@ -73,6 +73,7 @@
 
         <!-- Signature gradient accent line -->
         <View
+            android:id="@+id/accentLine"
             android:layout_width="match_parent"
             android:layout_height="3dp"
             android:layout_marginTop="18dp"
@@ -370,6 +371,7 @@
 
         <!-- Tip callout -->
         <LinearLayout
+            android:id="@+id/tipCallout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"

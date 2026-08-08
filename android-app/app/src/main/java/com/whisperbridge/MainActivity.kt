@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         refreshProfileChips()
         updateStatusView()
         applyAccentToView(binding.root)
+        ThemeManager.applyEarthPalette(binding.root)
 
        binding.btnSettings.setOnClickListener { showSettingsDialog() }
        binding.btnSend.setOnClickListener { sendText("type") }
@@ -134,6 +135,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         applyAccentToView(binding.root)
+        ThemeManager.applyEarthPalette(binding.root)
     }
 
     override fun onPause() {
@@ -215,13 +217,13 @@ class MainActivity : AppCompatActivity() {
                 }
                 cornerRadius = 9999
                 strokeWidth = 1
-                strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+                strokeColor = ColorStateList.valueOf(ThemeManager.color(this@MainActivity, R.color.border))
                 if (i == activeIdx) {
                     setBackgroundColor(accentSoft)
                     setTextColor(accent)
                 } else {
-                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
-                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    setBackgroundColor(ThemeManager.color(this@MainActivity, R.color.chip_bg))
+                    setTextColor(ThemeManager.color(this@MainActivity, R.color.text_secondary))
                 }
                 setOnClickListener { selectProfile(i) }
                 setOnLongClickListener {
@@ -245,8 +247,8 @@ class MainActivity : AppCompatActivity() {
             )
             cornerRadius = 9999
             strokeWidth = 1
-            strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
-            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.card_bg))
+            strokeColor = ColorStateList.valueOf(ThemeManager.color(this@MainActivity, R.color.border))
+            setBackgroundColor(ThemeManager.color(this@MainActivity, R.color.card_bg))
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_add)
             iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
             iconSize = 24
@@ -472,6 +474,7 @@ class MainActivity : AppCompatActivity() {
 
         val themeModes = listOf(
             Pair("Light", ThemeManager.ThemeMode.LIGHT),
+            Pair("Earth", ThemeManager.ThemeMode.EARTH),
             Pair("Dark OLED", ThemeManager.ThemeMode.DARK_OLED),
             Pair("System", ThemeManager.ThemeMode.SYSTEM)
         )
@@ -493,7 +496,7 @@ class MainActivity : AppCompatActivity() {
                 textSize = 12f
                 isAllCaps = false
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(18, 0, 18, 0)
+                setPadding(12, 0, 12, 0)
                 gravity = Gravity.CENTER
                 textAlignment = View.TEXT_ALIGNMENT_CENTER
                 layoutParams = LinearLayout.LayoutParams(
@@ -502,13 +505,13 @@ class MainActivity : AppCompatActivity() {
                 ).apply { marginEnd = 8 }
                 cornerRadius = 9999
                 strokeWidth = 1
-                strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
+                strokeColor = ColorStateList.valueOf(ThemeManager.color(this@MainActivity, R.color.border))
                 if (mode == currentMode) {
                     setBackgroundColor(ThemeManager.getAccentSoft(this@MainActivity))
                     setTextColor(accent)
                 } else {
-                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
-                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    setBackgroundColor(ThemeManager.color(this@MainActivity, R.color.chip_bg))
+                    setTextColor(ThemeManager.color(this@MainActivity, R.color.text_secondary))
                 }
                 setOnClickListener {
                     selectedThemeMode = mode
@@ -520,8 +523,8 @@ class MainActivity : AppCompatActivity() {
                             c.setBackgroundColor(ThemeManager.getAccentSoft(this@MainActivity))
                             c.setTextColor(accent)
                         } else {
-                            c.setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.chip_bg))
-                            c.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                            c.setBackgroundColor(ThemeManager.color(this@MainActivity, R.color.chip_bg))
+                            c.setTextColor(ThemeManager.color(this@MainActivity, R.color.text_secondary))
                         }
                     }
                 }
@@ -718,6 +721,11 @@ class MainActivity : AppCompatActivity() {
 
         scrollView.addView(dialogView)
 
+        if (ThemeManager.isEarth(this)) {
+            ThemeManager.applyEarthPalette(dialogView)
+            dialogView.setBackgroundColor(ThemeManager.color(this, R.color.card_bg))
+        }
+
         val dialog = AlertDialog.Builder(this)
             .setTitle("Settings")
             .setView(scrollView)
@@ -907,7 +915,7 @@ class MainActivity : AppCompatActivity() {
        binding.btnSend.text = "Type"
        binding.btnSend.contentDescription = if (configured) "Type on ${profile!!.name}" else "Type"
        val color = if (configured) R.color.status_ok else R.color.status_idle
-       binding.statusDot.setColorFilter(ContextCompat.getColor(this, color))
+       binding.statusDot.setColorFilter(ThemeManager.color(this, color))
         // M3 motion: idle status gently breathes so the user knows the app is
         // alive but waiting; connected sits solid.
         MotionKit.setBreathing(binding.statusDot, on = !configured)
@@ -1204,7 +1212,7 @@ class MainActivity : AppCompatActivity() {
         )
         binding.btnPinTrackpad.imageTintList = ColorStateList.valueOf(
             if (trackpadPinned) accent
-            else ContextCompat.getColor(this, R.color.text_tertiary)
+            else ThemeManager.color(this, R.color.text_tertiary)
         )
        flashMouseStatus(
            if (trackpadPinned) "Page scroll paused" else "Page scroll restored",
@@ -1286,9 +1294,9 @@ class MainActivity : AppCompatActivity() {
             btn.setTextColor(accent)
             btn.strokeColor = ColorStateList.valueOf(accent)
         } else {
-            btn.setBackgroundColor(ContextCompat.getColor(this, R.color.card_bg))
-            btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-            btn.strokeColor = ContextCompat.getColorStateList(this, R.color.border)
+            btn.setBackgroundColor(ThemeManager.color(this, R.color.card_bg))
+            btn.setTextColor(ThemeManager.color(this, R.color.text_primary))
+            btn.strokeColor = ColorStateList.valueOf(ThemeManager.color(this, R.color.border))
         }
     }
 
@@ -1300,19 +1308,16 @@ class MainActivity : AppCompatActivity() {
             btn.setTextColor(accent)
             btn.strokeColor = ColorStateList.valueOf(accent)
         } else {
-            btn.setBackgroundColor(ContextCompat.getColor(this, R.color.card_bg))
-            btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-            btn.strokeColor = ContextCompat.getColorStateList(this, R.color.border)
+            btn.setBackgroundColor(ThemeManager.color(this, R.color.card_bg))
+            btn.setTextColor(ThemeManager.color(this, R.color.text_primary))
+            btn.strokeColor = ColorStateList.valueOf(ThemeManager.color(this, R.color.border))
         }
     }
 
    private fun flashMouseStatus(text: String, ok: Boolean = false) {
        binding.mouseStatus.text = text
        binding.mouseStatus.setTextColor(
-           ContextCompat.getColor(
-               this,
-               if (ok) R.color.status_ok else R.color.status_err
-           )
+           ThemeManager.color(this, if (ok) R.color.status_ok else R.color.status_err)
        )
        binding.mouseStatus.visibility = View.VISIBLE
        mouseStatusJob?.cancel()
@@ -1324,10 +1329,7 @@ class MainActivity : AppCompatActivity() {
     private fun flashMouseStatusAnimated(text: String, ok: Boolean = false) {
         binding.mouseStatus.text = text
         binding.mouseStatus.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if (ok) R.color.status_ok else R.color.status_err
-            )
+            ThemeManager.color(this, if (ok) R.color.status_ok else R.color.status_err)
         )
         binding.mouseStatus.alpha = 0f
         binding.mouseStatus.visibility = View.VISIBLE
