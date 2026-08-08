@@ -11,7 +11,7 @@ android {
         applicationId = "com.whisperbridge"
         minSdk = 26
         targetSdk = 34
-        versionCode = (project.findProperty("VERSION_CODE") as? String)?.toInt() ?: 38
+        versionCode = (project.findProperty("VERSION_CODE") as? String)?.toInt() ?: 40
         versionName = (project.findProperty("VERSION_NAME") as? String) ?: "1.2.0"
     }
 

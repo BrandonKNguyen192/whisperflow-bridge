@@ -99,12 +99,12 @@
             android:id="@+id/composeCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-           app:cardBackgroundColor="@color/card_bg"
-           app:cardCornerRadius="20dp"
-           app:cardElevation="0dp"
-           app:strokeColor="@color/border"
-           app:strokeWidth="1dp">
+            android:layout_marginTop="20dp"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/border"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -166,8 +166,7 @@
                         android:text="Enter"
                         android:textColor="@color/accent"
                         app:icon="@drawable/ic_enter"
-                        app:iconTint="@color/accent"
-                        app:strokeColor="@color/accent" />
+                        app:iconTint="@color/accent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnClipboard"
@@ -179,8 +178,7 @@
                         android:text="Copy"
                         android:textColor="@color/text_primary"
                         app:icon="@drawable/ic_clipboard"
-                        app:iconTint="@color/accent"
-                        app:strokeColor="@color/border" />
+                        app:iconTint="@color/accent" />
                 </LinearLayout>
 
                 <CheckBox
@@ -201,12 +199,12 @@
             android:id="@+id/mouseCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-           app:cardBackgroundColor="@color/card_bg"
-           app:cardCornerRadius="20dp"
-           app:cardElevation="0dp"
-           app:strokeColor="@color/border"
-           app:strokeWidth="1dp">
+            android:layout_marginTop="20dp"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/border"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -244,11 +242,19 @@
                 <FrameLayout
                     android:id="@+id/trackpadSurface"
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
+                    android:layout_height="220dp"
                     android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_field_round">
+                    android:background="@drawable/bg_pad_round">
+
+                    <View
+                        android:id="@+id/trackpadGlow"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:alpha="0"
+                        android:visibility="gone" />
 
                     <ImageView
+                        android:id="@+id/trackpadCursor"
                         android:layout_width="26dp"
                         android:layout_height="26dp"
                         android:layout_gravity="center"
@@ -269,8 +275,7 @@
                         android:layout_height="56dp"
                         android:layout_weight="1"
                         android:text="Left"
-                        android:textColor="@color/text_primary"
-                        app:strokeColor="@color/border" />
+                        android:textColor="@color/text_primary" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnMouseRight"
@@ -280,8 +285,7 @@
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Right"
-                        android:textColor="@color/text_primary"
-                        app:strokeColor="@color/border" />
+                        android:textColor="@color/text_primary" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnMouseDouble"
@@ -291,8 +295,7 @@
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Double"
-                        android:textColor="@color/text_primary"
-                        app:strokeColor="@color/border" />
+                        android:textColor="@color/text_primary" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -310,8 +313,7 @@
                        android:text="Drag"
                        android:textColor="@color/text_primary"
                        app:icon="@drawable/ic_drag"
-                       app:iconTint="@color/text_primary"
-                       app:strokeColor="@color/border" />
+                       app:iconTint="@color/text_primary" />
 
                    <com.google.android.material.button.MaterialButton
                        android:id="@+id/btnScrollUp"
@@ -323,8 +325,7 @@
                        android:text="Scroll up"
                        android:textColor="@color/text_primary"
                        app:icon="@drawable/ic_chevron_up"
-                       app:iconTint="@color/text_primary"
-                       app:strokeColor="@color/border" />
+                       app:iconTint="@color/text_primary" />
 
                    <com.google.android.material.button.MaterialButton
                        android:id="@+id/btnScrollDown"
@@ -336,8 +337,7 @@
                        android:text="Scroll down"
                        android:textColor="@color/text_primary"
                        app:icon="@drawable/ic_chevron_down"
-                       app:iconTint="@color/text_primary"
-                       app:strokeColor="@color/border" />
+                       app:iconTint="@color/text_primary" />
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
@@ -355,8 +355,7 @@
                     app:iconGravity="textStart"
                     app:iconSize="18dp"
                     app:iconPadding="8dp"
-                    app:iconTint="@color/accent"
-                    app:strokeColor="@color/border" />
+                    app:iconTint="@color/accent" />
 
                 <TextView
                     android:id="@+id/mouseStatus"
@@ -374,7 +373,7 @@
             android:id="@+id/tipCallout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="20dp"
             android:background="@drawable/bg_soft_round"
             android:gravity="center_vertical"
             android:orientation="horizontal"

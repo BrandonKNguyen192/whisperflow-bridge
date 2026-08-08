@@ -205,7 +205,15 @@ object ThemeManager {
                 view.buttonTintList = ColorStateList.valueOf(accent)
             }
             is ImageButton -> view.imageTintList = ColorStateList.valueOf(earthPalette.textTertiary)
-            is FrameLayout -> view.background = earthFieldDrawable(context, accent)
+            is FrameLayout -> {
+                // Only the trackpad pad takes the field treatment. Scroll containers
+                // (HorizontalScrollView chip rows, NestedScrollView sheets) are also
+                // FrameLayouts and must stay transparent — otherwise they paint a
+                // stray outlined "track" behind the chips.
+                if (view.id == R.id.trackpadSurface) {
+                    view.background = earthPadDrawable(context)
+                }
+            }
             is TextView -> applyEarthTextColor(view)
         }
 
@@ -231,9 +239,9 @@ object ThemeManager {
 
     private fun applyEarthButton(button: MaterialButton, accent: Int) {
         val isAccentAction = button.currentTextColor == accent ||
-            button.strokeColor?.defaultColor == accent ||
             button.contentDescription == "Add computer"
-        val isPrimaryAction = button.id == R.id.btnSend
+        val isPrimaryAction = button.id == R.id.btnSend ||
+            button.id == R.id.btnSaveAll || button.id == R.id.btnSaveConnection
         val iconWasAccent = button.iconTint?.defaultColor == accent ||
             button.iconTint?.defaultColor == ContextCompat.getColor(button.context, R.color.accent)
 
@@ -243,12 +251,10 @@ object ThemeManager {
             button.iconTint = ColorStateList.valueOf(Color.WHITE)
         } else if (isAccentAction) {
             button.backgroundTintList = ColorStateList.valueOf(getAccentSoft(button.context))
-            button.strokeColor = ColorStateList.valueOf(accent)
             button.setTextColor(accent)
             button.iconTint = ColorStateList.valueOf(accent)
         } else {
-            button.backgroundTintList = ColorStateList.valueOf(earthPalette.card)
-            button.strokeColor = ColorStateList.valueOf(earthPalette.border)
+            button.backgroundTintList = ColorStateList.valueOf(earthPalette.chip)
             button.setTextColor(earthPalette.textPrimary)
             button.iconTint = ColorStateList.valueOf(
                 if (iconWasAccent) accent else earthPalette.textPrimary
@@ -280,16 +286,21 @@ object ThemeManager {
         return background
     }
 
+    /** Trackpad pad in Earth colors — matches bg_pad_round (20dp radius). */
+    private fun earthPadDrawable(context: Context): GradientDrawable =
+        roundedDrawable(context, earthPalette.input, earthPalette.border, 1, radiusDp = 20)
+
     private fun roundedDrawable(
         context: Context,
         fill: Int,
         stroke: Int,
-        strokeWidthDp: Int
+        strokeWidthDp: Int,
+        radiusDp: Int = 14
     ): GradientDrawable =
         GradientDrawable().apply {
             val density = context.resources.displayMetrics.density
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = 14f * density
+            cornerRadius = radiusDp * density
             setColor(fill)
             setStroke((strokeWidthDp * density).roundToInt(), stroke)
         }

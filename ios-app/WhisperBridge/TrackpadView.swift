@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WhisperBridgeCore
 
 struct TrackpadView: View {
@@ -15,6 +16,8 @@ struct TrackpadView: View {
     @State private var lastTranslation = CGSize.zero
     @State private var dragStartTime: Date?
     @State private var dragHeld = false
+    @State private var touchPoint: CGPoint?
+    @State private var pressedButton: String?
 
     private var palette: AppPalette { AppPalette.palette(for: theme.mode) }
     private var accent: Color { Color(hex: theme.accentHex) }
@@ -32,19 +35,34 @@ struct TrackpadView: View {
                     .foregroundStyle(palette.textTertiary)
             }
 
-            RoundedRectangle(cornerRadius: 20)
-                .fill(palette.input)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.clear)
                 .overlay(
-                    Image(systemName: "cursorarrow")
-                        .font(.system(size: 30, weight: .light))
-                        .foregroundStyle(accent.opacity(0.45))
+                    ZStack {
+                        Image(systemName: "cursorarrow")
+                            .font(.system(size: 30, weight: .light))
+                            .foregroundStyle(accent.opacity(0.45))
+                            .opacity(touchPoint == nil ? 1 : 0)
+                        if let touchPoint {
+                            Circle()
+                                .fill(accent.opacity(0.35))
+                                .frame(width: 64, height: 64)
+                                .blur(radius: 14)
+                                .position(touchPoint)
+                            Circle()
+                                .fill(accent.opacity(0.7))
+                                .frame(width: 14, height: 14)
+                                .position(touchPoint)
+                        }
+                    }
                 )
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(palette.border, lineWidth: 1))
                 .frame(height: 220)
                 .contentShape(Rectangle())
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .gesture(padGesture)
+                .animation(.easeOut(duration: 0.25), value: touchPoint == nil)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 mouseButton("Click", icon: "hand.tap", action: "click", button: "left")
                 mouseButton("Right", icon: "cursorarrow.click", action: "click", button: "right")
                 mouseButton("Double", icon: "cursorarrow.click.2", action: "double_click", button: "left")
@@ -53,13 +71,13 @@ struct TrackpadView: View {
             }
         }
         .padding(20)
-        .background(palette.card, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(palette.border, lineWidth: 1))
+        .glassCard()
     }
 
     private var padGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { value in
+                touchPoint = value.location
                 if dragStartTime == nil {
                     dragStartTime = Date()
                     lastTranslation = .zero
@@ -71,15 +89,18 @@ struct TrackpadView: View {
                 if !dragHeld && Date().timeIntervalSince(dragStartTime ?? Date()) > 0.4 {
                     dragHeld = true
                     sendControl(action: "down")
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
             }
             .onEnded { value in
+                touchPoint = nil
                 let duration = Date().timeIntervalSince(dragStartTime ?? Date())
                 let moved = hypot(value.translation.width, value.translation.height)
                 if dragHeld {
                     sendControl(action: "up")
                 } else if moved < (tapToClick ? 14 : 8) && duration < 0.35 {
                     sendControl(action: "click")
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
                 dragStartTime = nil
                 lastTranslation = .zero
@@ -96,18 +117,30 @@ struct TrackpadView: View {
     ) -> some View {
         Button {
             sendControl(action: action, dy: dy, button: button)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(Motion.pop) {
+                pressedButton = title
+            }
+            Task {
+                try? await Task.sleep(for: .milliseconds(350))
+                if pressedButton == title { pressedButton = nil }
+            }
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
+                    .symbolEffect(.bounce, value: pressedButton == title)
                 Text(title)
                     .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(palette.chip, in: RoundedRectangle(cornerRadius: 14))
-            .foregroundStyle(palette.textPrimary)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.roundedRectangle(radius: 14))
+        .tint(pressedButton == title ? accent : palette.textPrimary)
     }
 
     private func sendControl(

@@ -33,29 +33,50 @@
         <item name="cornerSize">16dp</item>
     </style>
 
-    <!-- Shared action buttons -->
+    <!-- Shared action buttons — Material Expressive: generous radii,
+         emphasized 14sp labels, pill vs rounded-square shape contrast. -->
 
-    <!-- Icon-over-text button (compose row). -->
+    <!-- Icon-over-text pill button (compose row). -->
   <style name="WB.IconTopButton" parent="Widget.Material3.Button">
     <item name="android:gravity">center</item>
     <item name="android:textAlignment">center</item>
-    <item name="android:textSize">12sp</item>
+    <item name="android:textSize">14sp</item>
     <item name="android:textStyle">bold</item>
     <item name="android:maxLines">1</item>
     <item name="android:ellipsize">none</item>
     <item name="android:minWidth">0dp</item>
-    <item name="android:paddingStart">4dp</item>
-    <item name="android:paddingEnd">4dp</item>
+    <item name="android:paddingStart">8dp</item>
+    <item name="android:paddingEnd">8dp</item>
     <item name="android:insetTop">0dp</item>
     <item name="android:insetBottom">0dp</item>
     <item name="iconGravity">textTop</item>
-    <item name="iconSize">18dp</item>
-    <item name="iconPadding">6dp</item>
-    <item name="cornerRadius">14dp</item>
+    <item name="iconSize">20dp</item>
+    <item name="iconPadding">5dp</item>
+    <item name="cornerRadius">32dp</item>
   </style>
 
-  <!-- Text-only outlined action button (mouse row). -->
-  <style name="WB.TextButton" parent="Widget.Material3.Button.OutlinedButton">
+  <!-- Text-only tonal action button (mouse row). Filled, no outline. -->
+  <style name="WB.TextButton" parent="Widget.Material3.Button">
+    <item name="android:gravity">center</item>
+    <item name="android:textAlignment">center</item>
+    <item name="android:textSize">14sp</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:maxLines">1</item>
+    <item name="android:ellipsize">none</item>
+    <item name="android:minWidth">0dp</item>
+    <item name="android:paddingStart">6dp</item>
+    <item name="android:paddingEnd">6dp</item>
+    <item name="android:insetTop">0dp</item>
+    <item name="android:insetBottom">0dp</item>
+    <item name="android:minHeight">0dp</item>
+    <item name="android:paddingTop">2dp</item>
+    <item name="android:paddingBottom">2dp</item>
+    <item name="cornerRadius">18dp</item>
+    <item name="backgroundTint">@color/chip_bg</item>
+  </style>
+
+  <!-- Icon-over-text tonal button (scroll/arrows). Filled, no outline. -->
+  <style name="WB.IconTopOutlined" parent="Widget.Material3.Button">
     <item name="android:gravity">center</item>
     <item name="android:textAlignment">center</item>
     <item name="android:textSize">13sp</item>
@@ -63,74 +84,59 @@
     <item name="android:maxLines">1</item>
     <item name="android:ellipsize">none</item>
     <item name="android:minWidth">0dp</item>
-    <item name="android:paddingStart">4dp</item>
-    <item name="android:paddingEnd">4dp</item>
-    <item name="android:insetTop">0dp</item>
-    <item name="android:insetBottom">0dp</item>
-    <item name="android:minHeight">0dp</item>
-    <item name="android:paddingTop">2dp</item>
-    <item name="android:paddingBottom">2dp</item>
-    <item name="cornerRadius">14dp</item>
-  </style>
-
-  <!-- Icon-over-text outlined button (scroll/arrows). -->
-  <style name="WB.IconTopOutlined" parent="Widget.Material3.Button.OutlinedButton">
-    <item name="android:gravity">center</item>
-    <item name="android:textAlignment">center</item>
-    <item name="android:textSize">12sp</item>
-    <item name="android:textStyle">bold</item>
-    <item name="android:maxLines">1</item>
-    <item name="android:ellipsize">none</item>
-    <item name="android:minWidth">0dp</item>
-    <item name="android:paddingStart">4dp</item>
-    <item name="android:paddingEnd">4dp</item>
+    <item name="android:paddingStart">6dp</item>
+    <item name="android:paddingEnd">6dp</item>
     <item name="android:insetTop">0dp</item>
     <item name="android:insetBottom">0dp</item>
     <item name="iconGravity">textTop</item>
-    <item name="iconSize">18dp</item>
-    <item name="iconPadding">6dp</item>
+    <item name="iconSize">20dp</item>
+    <item name="iconPadding">5dp</item>
     <item name="android:minHeight">0dp</item>
     <item name="android:paddingTop">2dp</item>
     <item name="android:paddingBottom">2dp</item>
-    <item name="cornerRadius">14dp</item>
+    <item name="cornerRadius">18dp</item>
+    <item name="backgroundTint">@color/chip_bg</item>
   </style>
 
-    <!-- Icon-left filled button (share sheet). -->
+    <!-- Icon-left filled pill button (share sheet). -->
     <style name="WB.IconStartButton" parent="Widget.Material3.Button">
         <item name="android:gravity">center</item>
         <item name="android:textAlignment">center</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">none</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:letterSpacing">-0.01</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="iconGravity">textStart</item>
         <item name="iconSize">18dp</item>
-        <item name="iconPadding">6dp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="cornerRadius">28dp</item>
     </style>
 
-    <!-- Icon-left outlined button (share sheet). -->
-    <style name="WB.IconStartOutlined" parent="Widget.Material3.Button.OutlinedButton">
+    <!-- Icon-left tonal pill button (share sheet). Filled, no outline. -->
+    <style name="WB.IconStartOutlined" parent="Widget.Material3.Button">
         <item name="android:gravity">center</item>
         <item name="android:textAlignment">center</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">none</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:letterSpacing">-0.01</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="iconGravity">textStart</item>
-        <item name="iconSize">16dp</item>
-        <item name="iconPadding">4dp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="cornerRadius">28dp</item>
+        <item name="backgroundTint">@color/chip_bg</item>
     </style>
 
     <!-- Icon-left text button (share sheet dismiss). -->
@@ -138,17 +144,18 @@
         <item name="android:gravity">center</item>
         <item name="android:textAlignment">center</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">none</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:letterSpacing">-0.01</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="iconGravity">textStart</item>
         <item name="iconSize">16dp</item>
-        <item name="iconPadding">4dp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="iconPadding">6dp</item>
+        <item name="cornerRadius">28dp</item>
     </style>
 </resources>

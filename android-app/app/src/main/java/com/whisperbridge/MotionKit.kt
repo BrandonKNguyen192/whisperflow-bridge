@@ -6,9 +6,12 @@ import android.animation.AnimatorSet
 import android.animation.ArgbEvaluator
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.Interpolator
 import android.view.animation.LinearInterpolator
+import android.view.animation.OvershootInterpolator
 import androidx.core.view.animation.PathInterpolatorCompat
 
 /**
@@ -40,6 +43,11 @@ object MotionKit {
     private val DECEL: Interpolator = PathInterpolatorCompat.create(0.05f, 0.7f, 0.1f, 1f)
     private val ACCEL: Interpolator = PathInterpolatorCompat.create(0.3f, 0f, 0.8f, 0.15f)
     val LINEAR: Interpolator = LinearInterpolator()
+
+    // Material Expressive leans on spring physics. OvershootInterpolator is
+    // the zero-dependency way to get that bouncy spring on the view system.
+    private val SPRING_SOFT = OvershootInterpolator(1.2f)
+    private val SPRING_BOUNCY = OvershootInterpolator(2.4f)
 
     /** Card fades in and rises to rest -- used on activity appearance. */
     fun revealRise(view: View, startDelay: Long = 0L) {
@@ -165,5 +173,129 @@ object MotionKit {
         views.forEachIndexed { i, v ->
             revealRise(v, startDelay = 40L + i * perChild)
         }
+    }
+
+    // -- Expressive spring helpers -----------------------------------
+
+    /**
+     * Scale-pop a view with a soft overshoot -- chip selection, checkmarks,
+     * save confirmations. Reads as a spring, costs one animator.
+     */
+    fun pop(view: View, bouncy: Boolean = false) {
+        view.animate().cancel()
+        view.scaleX = 0.82f
+        view.scaleY = 0.82f
+        view.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(DUR_MEDIUM_2)
+            .setInterpolator(if (bouncy) SPRING_BOUNCY else SPRING_SOFT)
+            .withLayer()
+            .start()
+    }
+
+    /**
+     * Expressive press physics: dip on touch-down, spring back with overshoot
+     * on release. Install as an OnTouchListener that returns false so the
+     * normal click/ripple pipeline still runs.
+     */
+    fun installSpringPress(view: View, dipScale: Float = 0.94f) {
+        view.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate().cancel()
+                    v.animate()
+                        .scaleX(dipScale)
+                        .scaleY(dipScale)
+                        .setDuration(DUR_SHORT_2)
+                        .setInterpolator(ACCEL)
+                        .withLayer()
+                        .start()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate().cancel()
+                    v.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(DUR_MEDIUM_2)
+                        .setInterpolator(SPRING_SOFT)
+                        .withLayer()
+                        .start()
+                }
+            }
+            false
+        }
+    }
+
+    /** Recursively install [installSpringPress] on every button in the tree. */
+    fun installSpringPressRecursive(root: View) {
+        if (root is android.widget.Button || root is android.widget.ImageButton) {
+            installSpringPress(root)
+        }
+        if (root is ViewGroup) {
+            for (i in 0 until root.childCount) {
+                installSpringPressRecursive(root.getChildAt(i))
+            }
+        }
+    }
+
+    /** Quick celebratory pulse: scale up then settle, one beat. */
+    fun successPulse(view: View) {
+        val up = ObjectAnimator.ofFloat(view, View.SCALE_X, 1f, 1.12f).apply {
+            duration = DUR_SHORT_2; interpolator = DECEL
+        }
+        val upY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1f, 1.12f).apply {
+            duration = DUR_SHORT_2; interpolator = DECEL
+        }
+        val down = ObjectAnimator.ofFloat(view, View.SCALE_X, 1.12f, 1f).apply {
+            duration = DUR_MEDIUM_2; interpolator = SPRING_SOFT
+        }
+        val downY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1.12f, 1f).apply {
+            duration = DUR_MEDIUM_2; interpolator = SPRING_SOFT
+        }
+        AnimatorSet().apply {
+            playSequentially(
+                AnimatorSet().apply { playTogether(up, upY) },
+                AnimatorSet().apply { playTogether(down, downY) }
+            )
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    view.scaleX = 1f
+                    view.scaleY = 1f
+                }
+            })
+            start()
+        }
+    }
+
+    /** Grow a horizontal accent line from its leading edge on first show. */
+    fun growFromStart(view: View, startDelay: Long = 0L) {
+        view.pivotX = 0f
+        view.scaleX = 0f
+        view.animate()
+            .scaleX(1f)
+            .setDuration(DUR_LONG_2)
+            .setInterpolator(DECEL)
+            .setStartDelay(startDelay)
+            .withLayer()
+            .start()
+    }
+
+    /** Crossfade-swap the text of a [android.widget.TextView]. */
+    fun swapText(view: android.widget.TextView, newText: CharSequence) {
+        view.animate().cancel()
+        view.animate()
+            .alpha(0f)
+            .setDuration(DUR_SHORT_2)
+            .setInterpolator(ACCEL)
+            .withEndAction {
+                view.text = newText
+                view.animate()
+                    .alpha(1f)
+                    .setDuration(DUR_SHORT_2)
+                    .setInterpolator(DECEL)
+                    .start()
+            }
+            .start()
     }
 }

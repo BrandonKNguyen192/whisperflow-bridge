@@ -90,9 +90,16 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
     }
 
     private func addCloseButton() {
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        button.tintColor = .white
+        let button: UIButton
+        if #available(iOS 26.0, *) {
+            var config = UIButton.Configuration.glass()
+            config.image = UIImage(systemName: "xmark")
+            button = UIButton(configuration: config)
+        } else {
+            button = UIButton(type: .system)
+            button.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+            button.tintColor = .white
+        }
         button.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         button.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(button)

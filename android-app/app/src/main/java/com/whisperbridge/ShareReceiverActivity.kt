@@ -31,6 +31,11 @@ class ShareReceiverActivity : AppCompatActivity() {
         applyAccentToView(binding.root)
         ThemeManager.applyEarthPalette(binding.root)
 
+        // Expressive entrance + spring press physics on every button.
+        MotionKit.revealRise(binding.shareCard, startDelay = 60L)
+        MotionKit.growFromStart(binding.accentLine, startDelay = 200L)
+        MotionKit.installSpringPressRecursive(binding.root)
+
         sharedText = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
             else -> ""
@@ -58,16 +63,16 @@ class ShareReceiverActivity : AppCompatActivity() {
 
     private fun applyAccentRecursive(view: View, accent: Int) {
         if (view is MaterialButton) {
-            val isFilled = view.backgroundTintList?.defaultColor?.let { Color.alpha(it) > 200 } ?: false
-            if (isFilled) {
+            val defaultAccent = ContextCompat.getColor(view.context, R.color.accent)
+            if (view.backgroundTintList?.defaultColor == defaultAccent) {
+                // Filled primary action (Type) — recolor the fill.
                 view.backgroundTintList = ColorStateList.valueOf(accent)
                 view.iconTint = ColorStateList.valueOf(Color.WHITE)
                 view.setTextColor(Color.WHITE)
             } else {
-                val strokeColor = view.strokeColor?.defaultColor ?: 0
-                if (strokeColor != 0 && strokeColor != ContextCompat.getColor(view.context, R.color.border)) {
-                    view.strokeColor = ColorStateList.valueOf(accent)
-                    view.setTextColor(accent)
+                // Tonal/neutral button — retint any accent-colored label or icon.
+                if (view.currentTextColor == defaultAccent) view.setTextColor(accent)
+                if (view.iconTint?.defaultColor == defaultAccent) {
                     view.iconTint = ColorStateList.valueOf(accent)
                 }
             }
@@ -106,6 +111,12 @@ class ShareReceiverActivity : AppCompatActivity() {
             binding.progress.visibility = View.GONE
             if (result.ok) {
                 vibrate()
+                val sentButton = when (mode) {
+                    "enter" -> binding.btnEnter
+                    "clipboard" -> binding.btnClipboard
+                    else -> binding.btnSend
+                }
+                MotionKit.successPulse(sentButton)
                 val target = profile.name
                 val label = if (mode == "enter") "Return key sent" else
                     if (mode == "clipboard") "Copied to $target clipboard" else "Typed on $target"

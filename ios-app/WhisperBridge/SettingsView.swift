@@ -15,9 +15,11 @@ struct SettingsView: View {
     @State private var message = ""
     @State private var messageIsError = false
     @State private var testing = false
+    @State private var savedFlash = false
     @State private var showScan = false
     @State private var showColorPicker = false
     @State private var customColor = Color(hex: ThemeStore.defaultAccent)
+    @Namespace private var modeGlass
 
     @AppStorage("trackpad_speed") private var trackpadSpeed = 5
     @AppStorage("tap_to_click") private var tapToClick = false
@@ -29,7 +31,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                palette.background.ignoresSafeArea()
+                AmbientBackground(palette: palette, accent: accent)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         connectionSection
@@ -40,12 +42,15 @@ struct SettingsView: View {
                     .frame(maxWidth: 640)
                     .frame(maxWidth: .infinity)
                 }
+                .scrollEdgeEffectStyle(.soft, for: .top)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .buttonStyle(.glassProminent)
+                        .tint(accent)
                 }
             }
             .sheet(isPresented: $showScan) {
@@ -81,20 +86,17 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .font(.body)
                     .padding(14)
-                    .background(palette.input, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(palette.border, lineWidth: 1))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
 
             HStack(spacing: 10) {
-                miniButton("Scan", icon: "qrcode.viewfinder") {
+                glassButton("Scan", icon: "qrcode.viewfinder") {
                     showScan = true
                 }
-                miniButton(testing ? "Testing…" : "Test", icon: "bolt") {
+                glassButton(testing ? "Testing…" : "Test", icon: "bolt", spinner: testing) {
                     testConnection()
                 }
-                primaryButton("Save") {
-                    saveConnection()
-                }
+                saveButton
             }
 
             if !message.isEmpty {
@@ -104,6 +106,8 @@ struct SettingsView: View {
                 )
                 .font(.footnote)
                 .foregroundStyle(messageIsError ? .red : accent)
+                .symbolEffect(.bounce, value: message)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             Button {
@@ -115,8 +119,28 @@ struct SettingsView: View {
             .tint(accent)
         }
         .padding(20)
-        .background(palette.card, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(palette.border, lineWidth: 1))
+        .glassCard()
+    }
+
+    private var saveButton: some View {
+        Button {
+            saveConnection()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: savedFlash ? "checkmark" : "checkmark")
+                    .contentTransition(.symbolEffect(.replace))
+                Text(savedFlash ? "Saved" : "Save")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.roundedRectangle(radius: 14))
+        .tint(accent)
     }
 
     private func field(
@@ -135,16 +159,17 @@ struct SettingsView: View {
                 .autocorrectionDisabled()
                 .font(.body)
                 .padding(14)
-                .background(palette.input, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(palette.border, lineWidth: 1))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
     private func saveConnection() {
         let index = profiles.activeIndex
         guard profiles.profiles.indices.contains(index) else {
-            message = "Add a computer first"
-            messageIsError = true
+            withAnimation(Motion.tap) {
+                message = "Add a computer first"
+                messageIsError = true
+            }
             return
         }
         let port = Int(portText.trimmingCharacters(in: .whitespaces)) ?? 9877
@@ -155,36 +180,49 @@ struct SettingsView: View {
             port: port,
             token: token.trimmingCharacters(in: .whitespaces)
         )
-        message = "Connection saved"
-        messageIsError = false
+        withAnimation(Motion.tap) {
+            message = "Connection saved"
+            messageIsError = false
+            savedFlash = true
+        }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task {
+            try? await Task.sleep(for: .seconds(1.4))
+            savedFlash = false
+        }
     }
 
     private func testConnection() {
         let trimmedHost = host.trimmingCharacters(in: .whitespaces)
         guard !trimmedHost.isEmpty else {
-            message = "Enter a host first"
-            messageIsError = true
+            withAnimation(Motion.tap) {
+                message = "Enter a host first"
+                messageIsError = true
+            }
             return
         }
         let port = Int(portText.trimmingCharacters(in: .whitespaces)) ?? 9877
         let trimmedToken = token.trimmingCharacters(in: .whitespaces)
-        testing = true
+        withAnimation(Motion.tap) { testing = true }
         Task {
             let result = trimmedToken.isEmpty
                 ? await BridgeClient.live.healthCheck(host: trimmedHost, port: port)
                 : await BridgeClient.live.probe(host: trimmedHost, port: port, token: trimmedToken)
-            message = result.message
-            messageIsError = !result.ok
-            testing = false
+            withAnimation(Motion.tap) {
+                message = result.message
+                messageIsError = !result.ok
+                testing = false
+            }
         }
     }
 
     private func pasteLink() {
         guard let raw = UIPasteboard.general.string,
               let parsed = Pairing.parse(raw) else {
-            message = "Clipboard doesn't contain a pairing link"
-            messageIsError = true
+            withAnimation(Motion.tap) {
+                message = "Clipboard doesn't contain a pairing link"
+                messageIsError = true
+            }
             return
         }
         host = parsed.host
@@ -210,21 +248,32 @@ struct SettingsView: View {
             Text("Theme")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(palette.textPrimary)
-            HStack(spacing: 8) {
-                ForEach(ThemeMode.allCases) { mode in
-                    Button {
-                        selectedMode = mode
-                        theme.setMode(mode)
-                    } label: {
-                        Text(mode.label)
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(selectedMode == mode ? accent : palette.chip, in: Capsule())
-                            .foregroundStyle(selectedMode == mode ? .white : palette.textPrimary)
-                            .overlay(Capsule().stroke(palette.border, lineWidth: 1))
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(ThemeMode.allCases) { mode in
+                        let isSelected = selectedMode == mode
+                        Button {
+                            withAnimation(Motion.tap) {
+                                selectedMode = mode
+                                theme.setMode(mode)
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Text(mode.label)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(isSelected ? accent : palette.textPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(
+                            (isSelected ? Glass.regular.tint(accent.opacity(0.35)) : .regular).interactive(),
+                            in: Capsule()
+                        )
+                        .glassEffectID(mode.id, in: modeGlass)
+                        .scaleEffect(isSelected ? 1.05 : 1.0)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
@@ -233,27 +282,36 @@ struct SettingsView: View {
                 .foregroundStyle(palette.textPrimary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
                 ForEach(Accents.options, id: \.hex) { option in
+                    let isSelected = selectedAccent == option.hex
                     Button {
-                        selectedAccent = option.hex
-                        theme.setAccent(option.hex)
+                        withAnimation(Motion.pop) {
+                            selectedAccent = option.hex
+                            theme.setAccent(option.hex)
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         ZStack {
                             Circle()
                                 .fill(Color(hex: option.hex))
-                                .frame(width: 46, height: 46)
                                 .overlay(
                                     Circle().stroke(
-                                        palette.border,
-                                        lineWidth: selectedAccent == option.hex ? 3 : 1
+                                        .white.opacity(0.6),
+                                        lineWidth: isSelected ? 2.5 : 0
                                     )
                                 )
-                            if selectedAccent == option.hex {
+                                .shadow(color: Color(hex: option.hex).opacity(isSelected ? 0.55 : 0.2),
+                                        radius: isSelected ? 10 : 3, y: 2)
+                            if isSelected {
                                 Image(systemName: "checkmark")
                                     .font(.body.weight(.bold))
                                     .foregroundStyle(.white)
+                                    .transition(.scale.combined(with: .opacity))
                             }
                         }
+                        .frame(width: 46, height: 46)
+                        .scaleEffect(isSelected ? 1.12 : 1.0)
                         .frame(maxWidth: .infinity)
+                        .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -267,14 +325,14 @@ struct SettingsView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(palette.chip, in: RoundedRectangle(cornerRadius: 14))
-                    .foregroundStyle(palette.textPrimary)
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.roundedRectangle(radius: 14))
+            .tint(palette.textPrimary)
         }
         .padding(20)
-        .background(palette.card, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(palette.border, lineWidth: 1))
+        .glassCard()
     }
 
     private var colorPickerSheet: some View {
@@ -283,7 +341,8 @@ struct SettingsView: View {
                 Circle()
                     .fill(customColor)
                     .frame(width: 84, height: 84)
-                    .overlay(Circle().stroke(palette.border, lineWidth: 1))
+                    .shadow(color: customColor.opacity(0.5), radius: 16, y: 4)
+                    .glassEffect(.regular, in: Circle())
                 ColorPicker("Accent color", selection: $customColor, supportsOpacity: false)
                     .padding(20)
                 Text("Selected \(customColor.hexString)")
@@ -298,6 +357,8 @@ struct SettingsView: View {
                         theme.setAccent(selectedAccent)
                         showColorPicker = false
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(accent)
                 }
             }
             .presentationDetents([.medium])
@@ -317,11 +378,16 @@ struct SettingsView: View {
                 Text("\(trackpadSpeed)")
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(accent)
+                    .contentTransition(.numericText())
             }
             Slider(
                 value: Binding(
                     get: { Double(trackpadSpeed) },
-                    set: { trackpadSpeed = Int($0.rounded()) }
+                    set: { newValue in
+                        withAnimation(Motion.tap) {
+                            trackpadSpeed = Int(newValue.rounded())
+                        }
+                    }
                 ),
                 in: 1...10,
                 step: 1
@@ -337,8 +403,7 @@ struct SettingsView: View {
                 .tint(accent)
         }
         .padding(20)
-        .background(palette.card, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(palette.border, lineWidth: 1))
+        .glassCard()
     }
 
     private func sectionLabel(_ text: String) -> some View {
@@ -347,10 +412,20 @@ struct SettingsView: View {
             .foregroundStyle(palette.textTertiary)
     }
 
-    private func miniButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func glassButton(
+        _ title: String,
+        icon: String,
+        spinner: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
+                if spinner {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Image(systemName: icon)
+                }
                 Text(title)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -358,24 +433,10 @@ struct SettingsView: View {
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
-            .background(palette.chip, in: RoundedRectangle(cornerRadius: 14))
-            .foregroundStyle(palette.textPrimary)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
-    }
-
-    private func primaryButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark")
-                Text(title)
-            }
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(accent, in: RoundedRectangle(cornerRadius: 14))
-            .foregroundStyle(.white)
-        }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.roundedRectangle(radius: 14))
+        .tint(accent)
     }
 }

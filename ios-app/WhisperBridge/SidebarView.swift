@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WhisperBridgeCore
 
 struct SidebarView: View {
@@ -16,7 +17,10 @@ struct SidebarView: View {
             Section("Computers") {
                 ForEach(Array(profiles.profiles.enumerated()), id: \.element.id) { index, profile in
                     Button {
-                        profiles.setActive(index)
+                        withAnimation(Motion.tap) {
+                            profiles.setActive(index)
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: profile.host.isEmpty ? "desktopcomputer" : "laptopcomputer")
@@ -67,7 +71,7 @@ struct SidebarView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
             .tint(accent)
             .padding(12)
         }

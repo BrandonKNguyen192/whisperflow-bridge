@@ -107,12 +107,72 @@ enum Accents {
     }
 }
 
-@available(iOS 26.0, *)
+// MARK: - Motion
+
+enum Motion {
+    /// Default spring for taps, selections, and small state changes.
+    static let tap = Animation.spring(duration: 0.35, bounce: 0.25)
+    /// Bouncier spring for playful moments (send success, chip pops).
+    static let pop = Animation.spring(duration: 0.45, bounce: 0.45)
+    /// Gentle spring for larger layout moves.
+    static let settle = Animation.spring(duration: 0.5, bounce: 0.12)
+}
+
+// MARK: - Liquid Glass
+
 extension View {
     /// Layered translucent material with Liquid Glass treatment on top.
-    func glassCard(cornerRadius: CGFloat) -> some View {
+    func glassCard(cornerRadius: CGFloat = 24) -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    /// Interactive glass pill — buttons, chips, toggles.
+    func glassPill<S: Shape>(in shape: S, tint: Color? = nil) -> some View {
+        self.glassEffect(
+            (tint.map { Glass.regular.tint($0) } ?? .regular).interactive(),
+            in: shape
+        )
+    }
+}
+
+// MARK: - Ambient background
+
+/// Slow-drifting color blobs that sit under the glass surfaces so the Liquid
+/// Glass has something alive to refract. Accent-tinted and theme aware.
+struct AmbientBackground: View {
+    let palette: AppPalette
+    let accent: Color
+
+    @State private var drift = false
+
+    var body: some View {
+        ZStack {
+            palette.background.ignoresSafeArea()
+            blob(accent.opacity(0.35), size: 340,
+                 offset: drift ? CGSize(width: 40, height: 30) : CGSize(width: -30, height: -40),
+                 anchor: .topLeading)
+            blob(Color(hex: "#4C8DFF").opacity(0.28), size: 300,
+                 offset: drift ? CGSize(width: -50, height: 20) : CGSize(width: 40, height: -20),
+                 anchor: .bottomTrailing)
+            blob(Color(hex: "#F2C14E").opacity(0.22), size: 260,
+                 offset: drift ? CGSize(width: 20, height: -30) : CGSize(width: -40, height: 40),
+                 anchor: .bottomLeading)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
+                drift = true
+            }
+        }
+    }
+
+    private func blob(_ color: Color, size: CGFloat, offset: CGSize, anchor: Alignment) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .blur(radius: 90)
+            .offset(offset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: anchor)
     }
 }
