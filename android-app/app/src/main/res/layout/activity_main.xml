@@ -147,7 +147,7 @@
                         android:id="@+id/btnSend"
                         style="@style/WB.IconTopButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
                         android:text="Type"
                         app:backgroundTint="@color/accent"
@@ -158,7 +158,7 @@
                         android:id="@+id/btnEnter"
                         style="@style/WB.IconTopOutlined"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Enter"
@@ -171,7 +171,7 @@
                         android:id="@+id/btnClipboard"
                         style="@style/WB.IconTopOutlined"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Copy"
@@ -263,7 +263,7 @@
                         android:id="@+id/btnMouseLeft"
                         style="@style/WB.TextButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="56dp"
                         android:layout_weight="1"
                         android:text="Left"
                         android:textColor="@color/text_primary"
@@ -273,7 +273,7 @@
                         android:id="@+id/btnMouseRight"
                         style="@style/WB.TextButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="56dp"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Right"
@@ -284,7 +284,7 @@
                         android:id="@+id/btnMouseDouble"
                         style="@style/WB.TextButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="56dp"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:text="Double"
@@ -298,43 +298,43 @@
                     android:layout_marginTop="10dp"
                     android:orientation="horizontal">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnMouseDrag"
-                        style="@style/WB.IconTopOutlined"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_weight="1"
-                        android:text="Drag"
-                        android:textColor="@color/text_primary"
-                        app:icon="@drawable/ic_drag"
-                        app:iconTint="@color/text_primary"
-                        app:strokeColor="@color/border" />
+                   <com.google.android.material.button.MaterialButton
+                       android:id="@+id/btnMouseDrag"
+                       style="@style/WB.IconTopOutlined"
+                       android:layout_width="0dp"
+                        android:layout_height="56dp"
+                       android:layout_weight="1"
+                       android:text="Drag"
+                       android:textColor="@color/text_primary"
+                       app:icon="@drawable/ic_drag"
+                       app:iconTint="@color/text_primary"
+                       app:strokeColor="@color/border" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnScrollUp"
-                        style="@style/WB.IconTopOutlined"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:text="Scroll up"
-                        android:textColor="@color/text_primary"
-                        app:icon="@drawable/ic_chevron_up"
-                        app:iconTint="@color/text_primary"
-                        app:strokeColor="@color/border" />
+                   <com.google.android.material.button.MaterialButton
+                       android:id="@+id/btnScrollUp"
+                       style="@style/WB.IconTopOutlined"
+                       android:layout_width="0dp"
+                        android:layout_height="56dp"
+                       android:layout_marginStart="10dp"
+                       android:layout_weight="1"
+                       android:text="Scroll up"
+                       android:textColor="@color/text_primary"
+                       app:icon="@drawable/ic_chevron_up"
+                       app:iconTint="@color/text_primary"
+                       app:strokeColor="@color/border" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnScrollDown"
-                        style="@style/WB.IconTopOutlined"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:text="Scroll down"
-                        android:textColor="@color/text_primary"
-                        app:icon="@drawable/ic_chevron_down"
-                        app:iconTint="@color/text_primary"
-                        app:strokeColor="@color/border" />
+                   <com.google.android.material.button.MaterialButton
+                       android:id="@+id/btnScrollDown"
+                       style="@style/WB.IconTopOutlined"
+                       android:layout_width="0dp"
+                        android:layout_height="56dp"
+                       android:layout_marginStart="10dp"
+                       android:layout_weight="1"
+                       android:text="Scroll down"
+                       android:textColor="@color/text_primary"
+                       app:icon="@drawable/ic_chevron_down"
+                       app:iconTint="@color/text_primary"
+                       app:strokeColor="@color/border" />
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
