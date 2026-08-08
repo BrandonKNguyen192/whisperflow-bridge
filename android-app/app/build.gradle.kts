@@ -11,8 +11,8 @@ android {
         applicationId = "com.whisperbridge"
         minSdk = 26
         targetSdk = 34
-        versionCode = (project.findProperty("VERSION_CODE") as? String)?.toInt() ?: 40
-        versionName = (project.findProperty("VERSION_NAME") as? String) ?: "1.2.0"
+        versionCode = (project.findProperty("VERSION_CODE") as? String)?.toInt() ?: 41
+        versionName = (project.findProperty("VERSION_NAME") as? String) ?: "1.3.0"
     }
 
     signingConfigs {
