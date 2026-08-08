@@ -219,8 +219,17 @@ public struct BridgeClient {
         let connection = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: .tcp)
 
         return await withCheckedContinuation { continuation in
+            // finish() is reachable from several threads at once — the global
+            // timeout queue, NWConnection's state handler, and the receive
+            // callbacks (all on a concurrent queue). Without a lock, two of
+            // them can resume the same continuation, which is a fatal Swift
+            // error. The air mouse fires ~30 requests/sec, so this race was
+            // hit in practice within seconds of use.
+            let lock = NSLock()
             var finished = false
             func finish(_ response: RawResponse) {
+                lock.lock()
+                defer { lock.unlock() }
                 guard !finished else { return }
                 finished = true
                 connection.cancel()

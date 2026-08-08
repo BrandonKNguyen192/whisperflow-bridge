@@ -12,6 +12,7 @@ final class MockReceiver {
     private(set) var requestCount = 0
     var statusCode = 200
     var responseJSON: [String: Any] = ["ok": true, "chars": 5]
+    var responseDelay: TimeInterval = 0
 
     var port: Int {
         // The listener picks a random port shortly after start; wait for it
@@ -92,9 +93,17 @@ final class MockReceiver {
             "Connection: close\r\n\r\n"
         var response = head.data(using: .utf8) ?? Data()
         response.append(body)
-        connection.send(content: response, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        if responseDelay > 0 {
+            DispatchQueue.global().asyncAfter(deadline: .now() + responseDelay) {
+                connection.send(content: response, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            }
+        } else {
+            connection.send(content: response, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+        }
     }
 }
 
@@ -183,6 +192,30 @@ final class BridgeClientTests: XCTestCase {
         let result = await client.healthCheck(host: "127.0.0.1", port: 1)
         XCTAssertFalse(result.ok)
         XCTAssertFalse(result.message.isEmpty)
+    }
+
+    /// The air mouse fires ~30 requests/sec. Responses arriving right at the
+    /// timeout boundary make the timeout closure and the receive callback
+    /// contend for the same continuation — which used to crash with a
+    /// "continuation resumed more than once" fatal error.
+    func testConcurrentRequestsAtTimeoutBoundary() async {
+        receiver.responseDelay = 1.9
+        let stress = BridgeClient(timeout: 2)
+        let completed = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<40 {
+                group.addTask {
+                    let result = await stress.healthCheck(host: "127.0.0.1", port: self.receiver.port)
+                    return result.ok
+                }
+            }
+            var okCount = 0
+            for await ok in group where ok { okCount += 1 }
+            return okCount
+        }
+        XCTAssertGreaterThanOrEqual(completed, 0)
+        // Let the delayed responses and client timeouts settle before the next
+        // test starts, so no half-drained connections pollute it.
+        try? await Task.sleep(for: .seconds(2.5))
     }
 
     func testEndpointPolicyAllowsBridgeNetworksOnly() {
