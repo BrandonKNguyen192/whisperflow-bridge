@@ -393,14 +393,17 @@ class MainActivity : AppCompatActivity() {
             text = "Scan"
             textSize = 13f
             isAllCaps = false
-            setPadding(24, 0, 24, 0)
+            setPadding(16, 0, 16, 0)
             gravity = Gravity.CENTER
             textAlignment = View.TEXT_ALIGNMENT_CENTER
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                0,
                 56
-            ).apply { marginEnd = 12 }
+            ).apply {
+                weight = 1f
+                marginEnd = 10
+            }
             cornerRadius = 9999
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
@@ -408,6 +411,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(accent)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_qr)
             iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            iconPadding = 6
             iconTint = ColorStateList.valueOf(accent)
         }
         connButtonRow.addView(btnScan)
@@ -416,14 +420,17 @@ class MainActivity : AppCompatActivity() {
             text = "Test"
             textSize = 13f
             isAllCaps = false
-            setPadding(24, 0, 24, 0)
+            setPadding(16, 0, 16, 0)
             gravity = Gravity.CENTER
             textAlignment = View.TEXT_ALIGNMENT_CENTER
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                0,
                 56
-            )
+            ).apply {
+                weight = 1f
+                marginEnd = 10
+            }
             cornerRadius = 9999
             strokeWidth = 1
             strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.border)
@@ -432,7 +439,48 @@ class MainActivity : AppCompatActivity() {
         }
         connButtonRow.addView(btnTest)
 
+        val btnSave = MaterialButton(this).apply {
+            text = "Save"
+            textSize = 13f
+            isAllCaps = false
+            setPadding(16, 0, 16, 0)
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                56
+            ).apply { weight = 1f }
+            cornerRadius = 9999
+            setBackgroundColor(accent)
+            setTextColor(Color.WHITE)
+            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_check)
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            iconPadding = 6
+            iconTint = ColorStateList.valueOf(Color.WHITE)
+        }
+        connButtonRow.addView(btnSave)
+
         dialogView.addView(connButtonRow)
+
+        fun saveConnection(): Boolean {
+            val host = etHost.text.toString().trim()
+            val port = etPort.text.toString().trim().toIntOrNull() ?: 9877
+            val token = etToken.text.toString().trim()
+            val activeIdx = ProfileManager.getActiveIndex(this)
+            val profiles = ProfileManager.getAll(this)
+            if (activeIdx !in profiles.indices) {
+                Toast.makeText(this, "No active profile yet", Toast.LENGTH_SHORT).show()
+                return false
+            }
+            ProfileManager.update(
+                this, activeIdx,
+                profiles[activeIdx].copy(host = host, port = port, token = token)
+            )
+            refreshProfileChips()
+            updateStatusView()
+            return true
+        }
 
         // Divider
         val divider = View(this).apply {
@@ -731,15 +779,7 @@ class MainActivity : AppCompatActivity() {
             .setView(scrollView)
             .setPositiveButton("Save") { _, _ ->
                 // Save connection
-                val host = etHost.text.toString().trim()
-                val port = etPort.text.toString().trim().toIntOrNull() ?: 9877
-                val token = etToken.text.toString().trim()
-                val activeIdx = ProfileManager.getActiveIndex(this)
-                val profiles = ProfileManager.getAll(this)
-                if (activeIdx in profiles.indices) {
-                    val updated = profiles[activeIdx].copy(host = host, port = port, token = token)
-                    ProfileManager.update(this, activeIdx, updated)
-                }
+                saveConnection()
 
                 // Save appearance
                 val needsRecreate = selectedThemeMode != currentMode || selectedAccentHex != currentAccentHex
@@ -762,6 +802,8 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .create()
 
+        dialog.setCanceledOnTouchOutside(false)
+
         btnScan.setOnClickListener {
             dialog.dismiss()
             launchScan()
@@ -783,6 +825,15 @@ class MainActivity : AppCompatActivity() {
                 btnTest.isEnabled = true
                 btnTest.text = if (result.ok) "✓ Connected" else "✗ Failed"
                 btnTest.postDelayed({ btnTest.text = "Test" }, 2000)
+            }
+        }
+
+        btnSave.setOnClickListener {
+            if (saveConnection()) {
+                Toast.makeText(this, "Connection saved", Toast.LENGTH_SHORT).show()
+                vibrateLight()
+                btnSave.text = "✓ Saved"
+                btnSave.postDelayed({ btnSave.text = "Save" }, 1500)
             }
         }
 

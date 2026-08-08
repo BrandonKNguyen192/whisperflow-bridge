@@ -15,6 +15,18 @@ The desktop receiver supports macOS, Ubuntu, and Windows. See [Privacy](PRIVACY.
 3. Open the local console at `http://localhost:9877` and scan its pairing QR from Android settings.
 4. Share text from Wispr Flow to Whisper Bridge, choose the destination profile, and tap **Type**.
 
+An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.md`).
+
+## Screenshots
+
+| iPhone / iPad app | |
+| --- | --- |
+| Light | ![iOS light](documentation/screenshots/ios-main-light.png) |
+| Dark OLED | ![iOS dark OLED](documentation/screenshots/ios-main-dark-oled.png) |
+| Earth | ![iOS earth](documentation/screenshots/ios-main-earth.png) |
+| Settings · Earth | ![iOS settings earth](documentation/screenshots/ios-settings-earth.png) |
+| Settings · Dark OLED | ![iOS settings dark OLED](documentation/screenshots/ios-settings-dark-oled.png) |
+
 ```
 ┌──────────────┐   WiFi / LAN / Tailscale   ┌──────────────┐
 │   Android     │  ──── HTTP POST ────►     │   Computer    │
