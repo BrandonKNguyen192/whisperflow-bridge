@@ -93,16 +93,17 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
-        <!-- Compose card -->
-        <com.google.android.material.card.MaterialCardView
+       <!-- Compose card -->
+       <com.google.android.material.card.MaterialCardView
+            android:id="@+id/composeCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/border"
-            app:strokeWidth="1dp">
+           app:cardBackgroundColor="@color/card_bg"
+           app:cardCornerRadius="20dp"
+           app:cardElevation="0dp"
+           app:strokeColor="@color/border"
+           app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -194,16 +195,17 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Mouse / trackpad -->
-        <com.google.android.material.card.MaterialCardView
+       <!-- Mouse / trackpad -->
+       <com.google.android.material.card.MaterialCardView
+            android:id="@+id/mouseCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/border"
-            app:strokeWidth="1dp">
+           app:cardBackgroundColor="@color/card_bg"
+           app:cardCornerRadius="20dp"
+           app:cardElevation="0dp"
+           app:strokeColor="@color/border"
+           app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"

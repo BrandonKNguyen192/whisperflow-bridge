@@ -86,18 +86,27 @@ class MainActivity : AppCompatActivity() {
         updateStatusView()
         applyAccentToView(binding.root)
 
-        binding.btnSettings.setOnClickListener { showSettingsDialog() }
-        binding.btnSend.setOnClickListener { sendText("type") }
-        binding.btnEnter.setOnClickListener { sendEnter() }
-        binding.btnClipboard.setOnClickListener { sendText("clipboard") }
-        binding.btnMouseLeft.setOnClickListener { sendMouseButton("click", "left", "Left click") }
-        binding.btnMouseRight.setOnClickListener { sendMouseButton("click", "right", "Right click") }
-        binding.btnMouseDouble.setOnClickListener { sendMouseButton("double_click", "left", "Double click") }
-        binding.btnScrollUp.setOnClickListener { sendMouseButton("scroll", "left", "Scroll up", dy = 90) }
-        binding.btnScrollDown.setOnClickListener { sendMouseButton("scroll", "left", "Scroll down", dy = -90) }
-        binding.btnMouseDrag.setOnClickListener { toggleDragMode() }
-        binding.trackpadSurface.setOnTouchListener { _, event -> onTrackpadTouch(event) }
-        binding.btnPinTrackpad.setOnClickListener { toggleTrackpadPin() }
+       binding.btnSettings.setOnClickListener { showSettingsDialog() }
+       binding.btnSend.setOnClickListener { sendText("type") }
+       binding.btnEnter.setOnClickListener { sendEnter() }
+       binding.btnClipboard.setOnClickListener { sendText("clipboard") }
+       binding.btnMouseLeft.setOnClickListener { sendMouseButton("click", "left", "Left click") }
+       binding.btnMouseRight.setOnClickListener { sendMouseButton("click", "right", "Right click") }
+       binding.btnMouseDouble.setOnClickListener { sendMouseButton("double_click", "left", "Double click") }
+       binding.btnScrollUp.setOnClickListener { sendMouseButton("scroll", "left", "Scroll up", dy = 90) }
+       binding.btnScrollDown.setOnClickListener { sendMouseButton("scroll", "left", "Scroll down", dy = -90) }
+       binding.btnMouseDrag.setOnClickListener { toggleDragMode() }
+       binding.trackpadSurface.setOnTouchListener { _, event -> onTrackpadTouch(event) }
+       binding.btnPinTrackpad.setOnClickListener { toggleTrackpadPin() }
+
+        // Material 3 entrance motion: stagger the brand bar + cards so the
+        // screen rises into place instead of snapping in.
+        MotionKit.revealRise(binding.composeCard, startDelay = 80L)
+        MotionKit.revealRise(binding.mouseCard, startDelay = 160L)
+        playBtnEnter(binding.btnSend)
+        playBtnEnter(binding.btnEnter)
+        playBtnEnter(binding.btnClipboard)
+
         binding.btnAirMouse.setOnTouchListener { v, ev ->
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -132,7 +141,20 @@ class MainActivity : AppCompatActivity() {
         if (airMouseActive) stopAirMouse()
     }
 
-    // ── Accent application ───────────────────────────────────────
+   // ── Accent application ───────────────────────────────────────
+
+    /** Soft M3 press-feedback used by the action buttons. */
+    private fun playBtnEnter(view: View) {
+        view.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { MotionKit.tapIn(v); false }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    MotionKit.pressPulse(v, ok = true); false
+                }
+                else -> false
+            }
+        }
+    }
 
     private fun applyAccentToView(root: View) {
         val accent = ThemeManager.getAccentColor(this)
@@ -236,12 +258,15 @@ class MainActivity : AppCompatActivity() {
         row.addView(addChip)
     }
 
-    private fun selectProfile(index: Int) {
-        ProfileManager.setActiveIndex(this, index)
-        refreshProfileChips()
-        updateStatusView()
-        vibrate()
-    }
+   private fun selectProfile(index: Int) {
+       ProfileManager.setActiveIndex(this, index)
+       refreshProfileChips()
+       updateStatusView()
+       vibrate()
+        // M3 micro-interaction: tap an active chip so the swap reads as a move.
+        val active = binding.profileChipRow.getChildAt(index) ?: return
+        MotionKit.pressPulse(active, ok = true)
+   }
 
     private fun promptAddProfile() {
         val input = EditText(this).apply {
@@ -873,18 +898,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun activeToken(): String = ProfileManager.getActive(this)?.token ?: ""
 
-    private fun updateStatusView() {
-        val profile = ProfileManager.getActive(this)
-        val configured = profile != null && profile.host.isNotEmpty()
-        binding.statusText.text = if (configured)
-            "${profile!!.name} · ${profile.host}"
-        else
-            "Not connected"
-        binding.btnSend.text = "Type"
-        binding.btnSend.contentDescription = if (configured) "Type on ${profile!!.name}" else "Type"
-        val color = if (configured) R.color.status_ok else R.color.status_idle
-        binding.statusDot.setColorFilter(ContextCompat.getColor(this, color))
-    }
+   private fun updateStatusView() {
+       val profile = ProfileManager.getActive(this)
+       val configured = profile != null && profile.host.isNotEmpty()
+       binding.statusText.text = if (configured)
+           "${profile!!.name} · ${profile.host}"
+       else
+           "Not connected"
+       binding.btnSend.text = "Type"
+       binding.btnSend.contentDescription = if (configured) "Type on ${profile!!.name}" else "Type"
+       val color = if (configured) R.color.status_ok else R.color.status_idle
+       binding.statusDot.setColorFilter(ContextCompat.getColor(this, color))
+        // M3 motion: idle status gently breathes so the user knows the app is
+        // alive but waiting; connected sits solid.
+        MotionKit.setBreathing(binding.statusDot, on = !configured)
+   }
 
     // ── Send actions ─────────────────────────────────────────────
 
@@ -1163,9 +1191,10 @@ class MainActivity : AppCompatActivity() {
             dragButtonDown = false
             lifecycleScope.launch { sendControl("up", button = "left") }
         }
-        updateDragButton()
-        flashMouseStatus(if (dragActive) "Drag on" else "Drag off", ok = true)
-    }
+       updateDragButton()
+        flashMouseStatusAnimated(if (dragActive) "Drag on" else "Drag off", ok = true)
+        MotionKit.pressPulse(binding.btnMouseDrag, ok = true)
+   }
 
     private fun toggleTrackpadPin() {
         trackpadPinned = !trackpadPinned
@@ -1178,12 +1207,13 @@ class MainActivity : AppCompatActivity() {
             if (trackpadPinned) accent
             else ContextCompat.getColor(this, R.color.text_tertiary)
         )
-        flashMouseStatus(
-            if (trackpadPinned) "Page scroll paused" else "Page scroll restored",
-            ok = trackpadPinned
-        )
-        vibrateLight()
-    }
+       flashMouseStatus(
+           if (trackpadPinned) "Page scroll paused" else "Page scroll restored",
+           ok = trackpadPinned
+       )
+       vibrateLight()
+        MotionKit.pressPulse(binding.btnPinTrackpad, ok = true)
+   }
 
     // ── Air mouse (gyroscope) ───────────────────────────────────
 
@@ -1277,7 +1307,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun flashMouseStatus(text: String, ok: Boolean = false) {
+   private fun flashMouseStatus(text: String, ok: Boolean = false) {
+       binding.mouseStatus.text = text
+       binding.mouseStatus.setTextColor(
+           ContextCompat.getColor(
+               this,
+               if (ok) R.color.status_ok else R.color.status_err
+           )
+       )
+       binding.mouseStatus.visibility = View.VISIBLE
+       mouseStatusJob?.cancel()
+       mouseStatusJob = lifecycleScope.launch {
+           delay(2200)
+           binding.mouseStatus.visibility = View.GONE
+       }
+   }
+    private fun flashMouseStatusAnimated(text: String, ok: Boolean = false) {
         binding.mouseStatus.text = text
         binding.mouseStatus.setTextColor(
             ContextCompat.getColor(
@@ -1285,11 +1330,20 @@ class MainActivity : AppCompatActivity() {
                 if (ok) R.color.status_ok else R.color.status_err
             )
         )
+        binding.mouseStatus.alpha = 0f
         binding.mouseStatus.visibility = View.VISIBLE
+        binding.mouseStatus.animate()
+            .alpha(1f)
+            .setDuration(MotionKit.DUR_SHORT_4)
+            .setStartDelay(0)
+            .withLayer()
+            .start()
         mouseStatusJob?.cancel()
         mouseStatusJob = lifecycleScope.launch {
-            delay(2200)
-            binding.mouseStatus.visibility = View.GONE
+            delay(2000)
+            MotionKit.fadeOut(binding.mouseStatus, onEnd = {
+                binding.mouseStatus.visibility = View.GONE
+            })
         }
     }
 
