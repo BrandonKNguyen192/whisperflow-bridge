@@ -53,6 +53,7 @@ gitignored — edit `project.yml`, then rerun `xcodegen generate`.
 - [x] Profiles with Keychain-backed tokens, sidebar + chips
 - [x] Compose: Type / Enter / Clipboard, enter-after
 - [x] Trackpad: move, tap-click, hold-drag, scroll, right/double click
+- [x] Air mouse: hold-to-activate CoreMotion gyro steering + sensitivity controls
 - [x] Themes: Light / Earth / Dark OLED / System + accent picker
 - [ ] Share extension (voice input from any app / Wispr Flow)
 - [ ] In-app dictation (`SFSpeechRecognizer`)

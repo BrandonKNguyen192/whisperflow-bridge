@@ -21,6 +21,8 @@ Then install the desktop receiver using `mac-server/install.command`, `ubuntu-se
 For the complete first-time setup, see [Getting Started](documentation/getting-started.md).
 Prefer a printable guide? Download the [Android setup walkthrough (PDF)](output/pdf/whisper-bridge-android-walkthrough.pdf).
 
+Using the iOS preview? Follow the [iPhone / iPad walkthrough](documentation/ios-getting-started.md) or download the [printable iPhone walkthrough (PDF)](output/pdf/whisper-bridge-iphone-walkthrough.pdf).
+
 An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.md`).
 
 ## Screenshots
