@@ -81,12 +81,46 @@ or expose port `9877` to the internet.
 For a second computer, add another profile in Whisper Bridge and pair it with
 that computer's QR. Switch profiles from the Compose screen before sending.
 
+## 6. Use The Trackpad
+
+The Mouse card sits below Compose and turns your phone into a remote pointer:
+
+- **Move:** drag one finger across the trackpad surface.
+- **Click:** tap the surface for a left click. **Left**, **Right**, and
+  **Double** send those button presses directly.
+- **Drag:** press and hold on the surface to drag an item, or tap **Drag** to
+  keep the button held.
+- **Scroll:** move two fingers to scroll, or use **Scroll up** / **Scroll down**.
+
+Tune **Trackpad speed**, **Tap to click**, and **Natural scrolling** in
+Settings. The receiver needs mouse permissions on the computer (macOS
+Accessibility) before cursor control works.
+
+## 7. Use Air Mouse
+
+1. Scroll to the bottom of the Mouse card.
+2. Press and hold **Hold for air mouse**.
+3. Tilt the phone to steer the cursor.
+4. Release the button to stop gyro control.
+
+If the motion feels too fast or reversed, adjust **Air mouse sensitivity** or
+enable **Invert air mouse direction** in Settings.
+
+## Personalize
+
+Settings also controls the look of the app: Light, Earth, Pure OLED Black, and
+System themes, plus a preset or custom RGB accent color. The frosted-glass
+surfaces and drifting ambient color follow the theme and accent you choose.
+
 ## Troubleshooting
 
 - **Test fails:** Verify Tailscale is connected on both devices, the receiver is
   running, and the phone profile uses the Tailscale QR or copied pairing link.
 - **The text does not appear:** Click the destination text field first. On macOS,
   enable Accessibility for the receiver or terminal in System Settings.
+- **The cursor does not move:** Click a destination field first and confirm the
+  receiver has mouse permissions. Keep holding **Hold for air mouse** while
+  tilting.
 - **Wispr Flow is missing from the flow:** Finish Wispr Flow setup, dictate once,
   then use Android's Share action. Whisper Bridge also accepts direct paste.
 - **Share sheet lacks Whisper Bridge:** Reinstall the APK and look under

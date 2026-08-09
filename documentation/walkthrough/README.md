@@ -5,6 +5,10 @@
 - `output/pdf/whisper-bridge-android-walkthrough.pdf`
 - `output/pdf/whisper-bridge-iphone-walkthrough.pdf`
 
+Both guides cover pairing, compose and send, and trackpad + air mouse control.
+The Android guide is drawn entirely with the generator; the iPhone guide embeds
+the compact simulator captures so its screens stay true to the app.
+
 Run it from the repository root with Xcode's Swift toolchain:
 
 ```bash

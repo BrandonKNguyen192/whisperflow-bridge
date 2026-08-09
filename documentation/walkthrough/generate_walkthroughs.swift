@@ -173,7 +173,7 @@ func drawAndroidPage(_ ctx: CGContext, _ page: Int) {
         drawLogo(ctx, x: margin, y: 32, width: 200)
         pill(ctx, "ANDROID WALKTHROUGH", x: margin, y: 132, width: 140)
         drawText(ctx: ctx, "Talk on your phone.\nType on your computer.", x: margin, y: 185, width: 510, size: 31, weight: .bold, lineSpacing: 2)
-        drawText(ctx: ctx, "A clean five-step setup for Wispr Flow, Tailscale, and Whisper Bridge. Pair once, then send dictated text to your Mac, Ubuntu, or Windows computer.", x: margin, y: 282, width: 470, size: 13, color: muted, lineSpacing: 4)
+        drawText(ctx: ctx, "A clean step-by-step setup for Wispr Flow, Tailscale, and Whisper Bridge. Pair once, then send dictated text — or steer the cursor — on your Mac, Ubuntu, or Windows computer.", x: margin, y: 282, width: 470, size: 13, color: muted, lineSpacing: 4)
         let box = CGRect(x: margin, y: 370, width: pageWidth - margin * 2, height: 180)
         cardBox(ctx, box, radius: 22)
         drawText(ctx: ctx, "THE SIMPLE VERSION", x: box.minX + 24, y: box.minY + 22, width: 200, size: 10, color: muted, weight: .bold)
@@ -195,7 +195,7 @@ func drawAndroidPage(_ ctx: CGContext, _ page: Int) {
         drawText(ctx: ctx, "whisperbridge.app  |  Open source setup guide", x: margin, y: 678, width: 400, size: 9, color: muted, weight: .bold)
         return
     }
-    header(ctx, section: ["", "BEFORE YOU START", "COMPUTER SETUP", "SECURE PAIRING", "YOUR DAILY FLOW"][page - 1], page: page, total: 5, footer: "WHISPER BRIDGE  |  ANDROID WALKTHROUGH")
+    header(ctx, section: ["", "BEFORE YOU START", "COMPUTER SETUP", "SECURE PAIRING", "YOUR DAILY FLOW", "TRACKPAD + AIR MOUSE"][page - 1], page: page, total: 6, footer: "WHISPER BRIDGE  |  ANDROID WALKTHROUGH")
     if page == 2 {
         drawText(ctx: ctx, "Install the three pieces.", x: margin, y: 100, width: 500, size: 27, weight: .bold)
         drawText(ctx: ctx, "Set these up once. The rest of this guide connects them together.", x: margin, y: 143, width: 500, size: 13, color: muted)
@@ -253,6 +253,24 @@ func drawAndroidPage(_ ctx: CGContext, _ page: Int) {
         drawText(ctx: ctx, "No camera scan?", x: margin + 22, y: 524, width: 200, size: 13, color: NSColor(calibratedRed: 0.55, green: 0.35, blue: 0.05, alpha: 1), weight: .bold)
         drawText(ctx: ctx, "Use Paste pairing link in Settings and paste the link copied from the receiver console.", x: margin + 22, y: 552, width: 460, size: 10, color: ink)
         drawText(ctx: ctx, "Keep Tailscale Funnel off. Whisper Bridge should stay private to your tailnet.", x: margin, y: 630, width: 510, size: 9, color: muted)
+    } else if page == 6 {
+        drawText(ctx: ctx, "Trackpad + air mouse.", x: margin, y: 100, width: 500, size: 27, weight: .bold)
+        drawText(ctx: ctx, "Steer the computer's cursor from the phone: move, click, drag, scroll, or tilt for air mouse.", x: margin, y: 143, width: 510, size: 12, color: muted)
+        let cards: [(String, String, CGFloat)] = [
+            ("Trackpad", "Drag one finger to move. Tap to click, hold to drag, two fingers to scroll.", 205),
+            ("Mouse buttons", "Left, Right, and Double send clicks. Drag holds the button; Up and Down scroll.", 205),
+            ("Air mouse", "Press and hold Hold for air mouse, tilt the phone to steer, release to stop.", 345),
+            ("Tune the feel", "Trackpad speed and air mouse sensitivity live in Settings; invert direction if needed.", 345)
+        ]
+        for (title, detail, y) in cards {
+            let x = title == "Trackpad" || title == "Air mouse" ? margin : 318
+            cardBox(ctx, CGRect(x: x, y: y, width: 242, height: 122), radius: 18)
+            drawText(ctx: ctx, title, x: x + 16, y: y + 18, width: 210, size: 12, color: green, weight: .bold)
+            drawText(ctx: ctx, detail, x: x + 16, y: y + 44, width: 212, size: 10, color: muted, lineSpacing: 2)
+        }
+        fill(ctx, CGRect(x: margin, y: 600, width: 508, height: 58), greenSoft, radius: 16)
+        drawText(ctx: ctx, "If the cursor does not move, click a destination field first and confirm the receiver has mouse permissions.", x: margin + 18, y: 618, width: 472, size: 9, color: ink)
+        drawText(ctx: ctx, "Release the air mouse button to stop gyro control immediately.", x: margin, y: 690, width: 510, size: 9, color: muted)
     } else {
         drawText(ctx: ctx, "Dictate. Share. Type.", x: margin, y: 100, width: 500, size: 27, weight: .bold)
         drawText(ctx: ctx, "Once paired, this is the whole routine. Switch profiles at the top whenever you want another computer.", x: margin, y: 143, width: 510, size: 12, color: muted)
@@ -384,7 +402,7 @@ func writePDF(path: String, pageCount: Int, drawPage: (CGContext, Int) -> Void) 
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 
 let androidPDF = output.appendingPathComponent("whisper-bridge-android-walkthrough.pdf").path
-writePDF(path: androidPDF, pageCount: 5) { ctx, page in drawAndroidPage(ctx, page) }
+writePDF(path: androidPDF, pageCount: 6) { ctx, page in drawAndroidPage(ctx, page) }
 
 let iOSMainLight = root.appendingPathComponent("documentation/screenshots/ios-walkthrough-main-light.png").path
 let iOSMainDark = root.appendingPathComponent("documentation/screenshots/ios-walkthrough-main-dark.png").path

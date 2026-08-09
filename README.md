@@ -23,7 +23,9 @@ Prefer a printable guide? Download the [Android setup walkthrough (PDF)](output/
 
 Using the iOS preview? Follow the [iPhone / iPad walkthrough](documentation/ios-getting-started.md) or download the [printable iPhone walkthrough (PDF)](output/pdf/whisper-bridge-iphone-walkthrough.pdf).
 
-An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.md`).
+A signed iOS/iPadOS preview is available in `ios-app/` (see
+[iPhone / iPad walkthrough](documentation/ios-getting-started.md) and
+`documentation/ios-plan.md`).
 
 ## Screenshots
 
@@ -47,11 +49,14 @@ An iOS/iPadOS app is in development in `ios-app/` (see `documentation/ios-plan.m
 ## Features ✨
 
 - **Multi-profile switching** — toggle between Mac, Ubuntu, and Windows computers with one-tap profile chips
-- **Theme system** — Light, Pure OLED Black (#000), and System modes. Choose a preset or any RGB accent color
+- **Theme system** — Light, Earth, Pure OLED Black (#000), and System modes. Choose a preset or any RGB accent color
 - **Enter/Return button** — separate button that sends a Return keypress
 - **Enter-after-type** — optional checkbox to auto-press Enter after pasting
 - **Pair by QR** — scan a QR code from the desktop console to auto-fill connection details
 - **Four modes** — Type (paste), Clipboard (copy only), Append (add to existing clipboard), and Enter (Return key)
+- **Remote trackpad** — steer and click the computer cursor from your phone, with drag, two-finger scroll, and click buttons
+- **Air mouse** — hold a button and tilt your phone; the gyroscope steers the cursor
+- **Frosted glass UI** — ambient drifting color, translucent surfaces, and real backdrop blur on Android 12+ and iOS 26+
 - **Remote via Tailscale** — works anywhere, not just on your home WiFi. Token-based auth
 - **Login item** — `--install-login` makes it launch at boot and stay alive
 - **Share sheet integration** — preview and confirm text shared from Wispr Flow
