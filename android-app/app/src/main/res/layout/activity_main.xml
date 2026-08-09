@@ -1,11 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.whisperbridge.LockableScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:fillViewport="true"
-    android:scrollbarThumbVertical="@color/border">
+    android:background="@color/bg">
+
+    <!-- Liquid-glass ambient backdrop: drifting color blobs behind the frost -->
+    <FrameLayout
+        android:id="@+id/ambientLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.whisperbridge.LockableScrollView
+        android:id="@+id/scrollRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbarThumbVertical="@color/border">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -100,10 +111,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            app:cardBackgroundColor="@color/card_bg"
+            app:cardBackgroundColor="@color/glass_card"
             app:cardCornerRadius="28dp"
             app:cardElevation="0dp"
-            app:strokeColor="@color/border"
+            app:strokeColor="@color/glass_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -200,10 +211,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            app:cardBackgroundColor="@color/card_bg"
+            app:cardBackgroundColor="@color/glass_card"
             app:cardCornerRadius="28dp"
             app:cardElevation="0dp"
-            app:strokeColor="@color/border"
+            app:strokeColor="@color/glass_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -357,14 +368,14 @@
                     app:iconPadding="8dp"
                     app:iconTint="@color/accent" />
 
-                <TextView
-                    android:id="@+id/mouseStatus"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
+            <TextView
+                android:id="@+id/mouseStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -397,3 +408,4 @@
         </LinearLayout>
     </LinearLayout>
 </com.whisperbridge.LockableScrollView>
+</FrameLayout>

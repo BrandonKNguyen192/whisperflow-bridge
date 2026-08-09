@@ -298,4 +298,42 @@ object MotionKit {
             }
             .start()
     }
+
+    // -- Ambient backdrop drift -----------------------------------
+
+    private val driftAnimators = mutableListOf<Animator>()
+
+    /**
+     * Slowly float the color blobs behind the frosted glass — the Android
+     * take on Liquid Glass's living backdrop. Long, gentle sine-ish drift so
+     * the translucency reads as depth instead of motion noise.
+     */
+    fun startAmbientDrift(blobs: List<View>) {
+        stopAmbientDrift()
+        blobs.forEachIndexed { i, blob ->
+            val density = blob.resources.displayMetrics.density
+            val dx = 26f * density
+            val startX = blob.translationX
+            val startY = blob.translationY
+            val anim = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 11_000L + i * 2_500L
+                repeatMode = ValueAnimator.REVERSE
+                repeatCount = ValueAnimator.INFINITE
+                interpolator = PathInterpolatorCompat.create(0.45f, 0f, 0.55f, 1f)
+                addUpdateListener { a ->
+                    val t = a.animatedValue as Float
+                    val sway = if (i % 2 == 0) t else -t
+                    blob.translationX = startX + dx * t
+                    blob.translationY = startY + dx * 0.55f * sway
+                }
+                start()
+            }
+            driftAnimators += anim
+        }
+    }
+
+    fun stopAmbientDrift() {
+        driftAnimators.forEach { it.cancel() }
+        driftAnimators.clear()
+    }
 }

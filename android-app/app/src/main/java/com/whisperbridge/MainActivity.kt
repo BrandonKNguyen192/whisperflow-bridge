@@ -87,6 +87,7 @@ class MainActivity : AppCompatActivity() {
         updateStatusView()
         applyAccentToView(binding.root)
         ThemeManager.applyEarthPalette(binding.root)
+        ThemeManager.setupAmbient(binding.ambientLayer)
 
        binding.btnSettings.setOnClickListener { showSettingsDialog() }
        binding.btnSend.setOnClickListener { sendText("type") }
@@ -284,6 +285,8 @@ class MainActivity : AppCompatActivity() {
                 updateStatusView()
             }
             .setNegativeButton("Cancel", null)
+            .create()
+            .apply { applyDialogFrost(this) }
             .show()
     }
 
@@ -304,6 +307,8 @@ class MainActivity : AppCompatActivity() {
                 updateStatusView()
             }
             .setNegativeButton("Cancel", null)
+            .create()
+            .apply { applyDialogFrost(this) }
             .show()
     }
 
@@ -572,13 +577,28 @@ class MainActivity : AppCompatActivity() {
         if (ThemeManager.isEarth(this)) {
             ThemeManager.applyEarthPalette(root)
         }
+        ThemeManager.setupAmbient(root.findViewById(R.id.ambientLayer))
 
         sheet.setOnShowListener {
             val bottomSheet = sheet.findViewById<FrameLayout>(
                 com.google.android.material.R.id.design_bottom_sheet
             )
             bottomSheet?.let {
-                it.setBackgroundColor(ThemeManager.color(this, R.color.bg))
+                // Frosted sheet over a real blurred backdrop on Android 12+;
+                // older devices fall back to a heavier dim.
+                it.setBackgroundColor(
+                    if (ThemeManager.isEarth(this)) {
+                        Color.argb(200, 251, 248, 241)
+                    } else {
+                        ContextCompat.getColor(this, R.color.glass_card)
+                    }
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    sheet.window?.setBackgroundBlurRadius(30)
+                    sheet.window?.setDimAmount(0.22f)
+                } else {
+                    sheet.window?.setDimAmount(0.45f)
+                }
                 val behavior = BottomSheetBehavior.from(it)
                 behavior.skipCollapsed = true
                 behavior.state = BottomSheetBehavior.STATE_EXPANDED
@@ -661,6 +681,7 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
             }
         }
+        applyDialogFrost(dialog)
         dialog.show()
     }
 
@@ -1024,7 +1045,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleTrackpadPin() {
         trackpadPinned = !trackpadPinned
-        binding.root.scrollLocked = trackpadPinned
+        binding.scrollRoot.scrollLocked = trackpadPinned
         val accent = ThemeManager.getAccentColor(this)
         binding.btnPinTrackpad.setImageResource(
             if (trackpadPinned) R.drawable.ic_lock_closed else R.drawable.ic_lock_open
@@ -1213,10 +1234,20 @@ class MainActivity : AppCompatActivity() {
                 updateStatusView()
                 vibrate()
             }
+            .create()
+            .apply { applyDialogFrost(this) }
             .show()
     }
 
     // ── Haptics ──────────────────────────────────────────────────
+
+    /** Frosted-glass backdrop blur for alert dialogs (Android 12+). */
+    private fun applyDialogFrost(dialog: android.app.AlertDialog) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            dialog.window?.setBackgroundBlurRadius(25)
+            dialog.window?.setDimAmount(0.35f)
+        }
+    }
 
     private fun vibrate() {
         try {

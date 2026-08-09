@@ -6,6 +6,12 @@
     <color name="card_bg">#FFFFFF</color>
     <color name="input_bg">#FFFFFF</color>
 
+    <!-- frosted glass surfaces — translucent so the ambient backdrop shows -->
+    <color name="glass_card">#B8FFFFFF</color>
+    <color name="glass_input">#A6FFFFFF</color>
+    <color name="glass_border">#40FFFFFF</color>
+    <color name="glass_soft">#8CE9F2EC</color>
+
     <!-- text -->
     <color name="text_primary">#1D1D1F</color>
     <color name="text_secondary">#6E6E73</color>

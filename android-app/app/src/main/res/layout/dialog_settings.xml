@@ -2,10 +2,20 @@
 <!-- Settings bottom-sheet content. All sizes in dp so buttons and labels
      keep proper proportions on every density (the old dialog built its
      LayoutParams in raw pixels, which is what made everything look bunched). -->
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent">
+
+    <!-- Frosted backdrop for the sheet (real blur comes from the window on API 31+) -->
+    <FrameLayout
+        android:id="@+id/ambientLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+<androidx.core.widget.NestedScrollView
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:fillViewport="true">
 
 <LinearLayout
@@ -49,7 +59,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="14dp"
-        app:cardBackgroundColor="@color/card_bg"
+        app:cardBackgroundColor="@color/glass_card"
         app:cardCornerRadius="28dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/border"
@@ -197,7 +207,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        app:cardBackgroundColor="@color/card_bg"
+        app:cardBackgroundColor="@color/glass_card"
         app:cardCornerRadius="28dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/border"
@@ -284,7 +294,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        app:cardBackgroundColor="@color/card_bg"
+        app:cardBackgroundColor="@color/glass_card"
         app:cardCornerRadius="28dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/border"
@@ -437,5 +447,6 @@
             app:icon="@drawable/ic_check"
             app:iconTint="@android:color/white" />
     </LinearLayout>
-</LinearLayout>
+    </LinearLayout>
 </androidx.core.widget.NestedScrollView>
+</FrameLayout>

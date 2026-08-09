@@ -30,6 +30,7 @@ class ShareReceiverActivity : AppCompatActivity() {
 
         applyAccentToView(binding.root)
         ThemeManager.applyEarthPalette(binding.root)
+        ThemeManager.setupAmbient(binding.ambientLayer)
 
         // Expressive entrance + spring press physics on every button.
         MotionKit.revealRise(binding.shareCard, startDelay = 60L)

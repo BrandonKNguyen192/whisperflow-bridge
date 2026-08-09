@@ -6,6 +6,12 @@
     <color name="card_bg">#FF0D0D0D</color>
     <color name="input_bg">#FF0D0D0D</color>
 
+    <!-- frosted glass surfaces — translucent over the OLED ambient backdrop -->
+    <color name="glass_card">#1CFFFFFF</color>
+    <color name="glass_input">#26FFFFFF</color>
+    <color name="glass_border">#33FFFFFF</color>
+    <color name="glass_soft">#660F2A1A</color>
+
     <!-- text -->
     <color name="text_primary">#FFF5F5F7</color>
     <color name="text_secondary">#FFA1A1A6</color>

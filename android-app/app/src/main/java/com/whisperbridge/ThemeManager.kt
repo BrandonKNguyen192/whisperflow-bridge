@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CompoundButton
@@ -191,8 +192,9 @@ object ThemeManager {
         val accent = getAccentColor(context)
         when (view) {
             is MaterialCardView -> {
-                view.setCardBackgroundColor(earthPalette.card)
-                view.strokeColor = earthPalette.border
+                // Frosted: translucent warm card over the ambient backdrop.
+                view.setCardBackgroundColor(withAlpha(earthPalette.card, 200))
+                view.strokeColor = withAlpha(earthPalette.border, 110)
             }
             is MaterialButton -> applyEarthButton(view, accent)
             is EditText -> {
@@ -227,7 +229,12 @@ object ThemeManager {
                 )
             )
         } else if (view.id == R.id.tipCallout) {
-            view.background = roundedDrawable(context, earthPalette.greenSoft, earthPalette.greenSoft, 0)
+            view.background = roundedDrawable(
+                context,
+                withAlpha(earthPalette.greenSoft, 170),
+                earthPalette.greenSoft,
+                0
+            )
         }
 
         if (view is ViewGroup) {
@@ -236,6 +243,10 @@ object ThemeManager {
             }
         }
     }
+
+    /** Alpha-preserving helper for translucent glass surfaces. */
+    private fun withAlpha(color: Int, alpha: Int): Int =
+        Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 
     private fun applyEarthButton(button: MaterialButton, accent: Int) {
         val isAccentAction = button.currentTextColor == accent ||
@@ -288,7 +299,13 @@ object ThemeManager {
 
     /** Trackpad pad in Earth colors — matches bg_pad_round (20dp radius). */
     private fun earthPadDrawable(context: Context): GradientDrawable =
-        roundedDrawable(context, earthPalette.input, earthPalette.border, 1, radiusDp = 20)
+        roundedDrawable(
+            context,
+            withAlpha(earthPalette.input, 200),
+            withAlpha(earthPalette.border, 110),
+            1,
+            radiusDp = 20
+        )
 
     private fun roundedDrawable(
         context: Context,
@@ -304,4 +321,65 @@ object ThemeManager {
             setColor(fill)
             setStroke((strokeWidthDp * density).roundToInt(), stroke)
         }
+
+    // ── Ambient glass backdrop ────────────────────────────────────
+
+    /** Soft radial color blob used by the Liquid-Glass-style backdrop. */
+    fun createAmbientBlob(context: Context, color: Int, alpha: Int, sizeDp: Int): View {
+        val size = (sizeDp * context.resources.displayMetrics.density).roundToInt()
+        return View(context).apply {
+            val gd = GradientDrawable().apply {
+                gradientType = GradientDrawable.RADIAL_GRADIENT
+                colors = intArrayOf(
+                    Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)),
+                    Color.TRANSPARENT
+                )
+                gradientRadius = size / 2f
+            }
+            background = gd
+            layoutParams = FrameLayout.LayoutParams(size, size)
+        }
+    }
+
+    /**
+     * Fill a backdrop container with accent + brand blobs and start them
+     * drifting. Call once per screen; safe to re-run on recreate.
+     */
+    fun setupAmbient(container: FrameLayout) {
+        val context = container.context
+        container.removeAllViews()
+        val accent = getAccentColor(context)
+        val blue = ContextCompat.getColor(context, R.color.grad_blue)
+        val amber = ContextCompat.getColor(context, R.color.grad_amber)
+        val isDark = when (getThemeMode(context)) {
+            ThemeMode.DARK_OLED -> true
+            ThemeMode.SYSTEM -> {
+                val night = context.resources.configuration.uiMode and
+                    android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                night == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            }
+            ThemeMode.LIGHT, ThemeMode.EARTH -> false
+        }
+
+        val blobs = mutableListOf<View>()
+        blobs += createAmbientBlob(context, accent, if (isDark) 120 else 85, 340).also { blob ->
+            blob.translationX = -60 * context.resources.displayMetrics.density
+            blob.translationY = -80 * context.resources.displayMetrics.density
+            (blob.layoutParams as FrameLayout.LayoutParams).gravity = Gravity.TOP or Gravity.START
+            container.addView(blob)
+        }
+        blobs += createAmbientBlob(context, blue, if (isDark) 95 else 65, 300).also { blob ->
+            blob.translationX = 70 * context.resources.displayMetrics.density
+            blob.translationY = -30 * context.resources.displayMetrics.density
+            (blob.layoutParams as FrameLayout.LayoutParams).gravity = Gravity.TOP or Gravity.END
+            container.addView(blob)
+        }
+        blobs += createAmbientBlob(context, amber, if (isDark) 85 else 55, 260).also { blob ->
+            blob.translationX = -40 * context.resources.displayMetrics.density
+            blob.translationY = 60 * context.resources.displayMetrics.density
+            (blob.layoutParams as FrameLayout.LayoutParams).gravity = Gravity.BOTTOM or Gravity.START
+            container.addView(blob)
+        }
+        MotionKit.startAmbientDrift(blobs)
+    }
 }
