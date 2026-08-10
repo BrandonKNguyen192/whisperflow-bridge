@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: "5.0"
     DEVELOPMENT_TEAM: "3GKZY82PF6"
     CURRENT_PROJECT_VERSION: "1"
-    MARKETING_VERSION: "1.1.0"
+    MARKETING_VERSION: "1.3.0"
 
 targets:
   WhisperBridgeCore:
@@ -35,6 +35,8 @@ targets:
       path: WhisperBridge/Info.plist
       properties:
         CFBundleDisplayName: Whisper Bridge
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
