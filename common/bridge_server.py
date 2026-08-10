@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import threading
@@ -99,6 +100,28 @@ def get_lan_ip():
     return "127.0.0.1"
 
 _tail_cache = {"ip": None, "ts": 0.0}
+_tail_bin_cache = {"bin": None}
+
+
+def _find_tailscale() -> str | None:
+    """Locate the tailscale CLI even when launchd/Finder PATH omits Homebrew."""
+    if _tail_bin_cache["bin"] is not None:
+        return _tail_bin_cache["bin"]
+    candidates = [
+        shutil.which("tailscale"),
+        "/opt/homebrew/bin/tailscale",
+        "/usr/local/bin/tailscale",
+        "/opt/local/bin/tailscale",
+        "/opt/homebrew/sbin/tailscale",
+        "/usr/local/sbin/tailscale",
+    ]
+    for cand in candidates:
+        if cand and os.path.exists(cand):
+            _tail_bin_cache["bin"] = cand
+            return cand
+    return None
+
+
 def get_tail_ip(force=False):
     """Cached Tailscale IPv4 (None if Tailscale is absent/offline). Cached 15s."""
     now = time.time()
@@ -106,8 +129,13 @@ def get_tail_ip(force=False):
         return _tail_cache["ip"]
     ip = None
     try:
-        out = subprocess.run(["tailscale", "ip", "-4"],
-                             capture_output=True, text=True, timeout=1.5).stdout.strip()
+        binary = _find_tailscale()
+        if binary is None:
+            ip = None
+            out = ""
+        else:
+            out = subprocess.run([binary, "ip", "-4"],
+                                 capture_output=True, text=True, timeout=1.5).stdout.strip()
         if out:
             ip = out.splitlines()[0].strip() or None
     except Exception:
