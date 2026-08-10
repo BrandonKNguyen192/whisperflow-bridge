@@ -11,5 +11,6 @@ To remove login startup, double-click `mac-server/uninstall.command`.
 Prefer a menu-bar control? Run `python3 mac-server/menubar.py --install-app`
 from the repo to build **Whisper Bridge.app** in `~/Applications`. It adds a
 menu-bar item with one-click **Stop bridge** / **Start bridge** and a
-**Launch at login** toggle, so you can bring the receiver online and offline
-without touching the terminal.
+**Launch at login** toggle, and registers itself as the login item (retiring
+the older `launch.py` service automatically), so you can bring the receiver
+online and offline without touching the terminal.

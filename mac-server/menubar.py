@@ -48,17 +48,36 @@ def status_dot(bound: bool, tail_ip) -> str:
 LABEL = "com.whisperbridge.menubar"
 PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{LABEL}.plist")
 LOG_PATH = os.path.expanduser("~/Library/Logs/whisperbridge-menubar.log")
+LEGACY_LABEL = "com.whisperbridge.launcher"
+LEGACY_PLIST = os.path.expanduser(f"~/Library/LaunchAgents/{LEGACY_LABEL}.plist")
 INSTALL_DIR = os.path.expanduser("~/Library/Application Support/WhisperBridge")
 APP_DIR = os.path.expanduser("~/Applications/Whisper Bridge.app")
 APP_EXEC = "whisper-bridge-menubar"
+GUI_LOG_PATH = os.path.expanduser("~/Library/Logs/whisperbridge-menubar.log")
+LOCK_PATH = os.path.join(INSTALL_DIR, "menubar.lock")
+
+_LOCK_HANDLE = None
+
+
+def _redirect_to_log() -> None:
+    """Finder-launched apps have no console; keep a log so failures are visible."""
+    if sys.stdout.isatty():
+        return
+    os.makedirs(os.path.dirname(GUI_LOG_PATH), exist_ok=True)
+    fh = open(GUI_LOG_PATH, "a", encoding="utf-8")
+    sys.stdout = fh
+    sys.stderr = fh
 
 
 # ── Login item (LaunchAgent) ────────────────────────────────────────────────
 
 def build_plist(port: int, token: str | None,
                 no_sound: bool = False, sound_name: str | None = None,
-                log_content: bool = False, allow_hosts: list[str] | None = None) -> str:
-    args = [sys.executable, os.path.abspath(__file__), "--port", str(port)]
+                log_content: bool = False, allow_hosts: list[str] | None = None,
+                python_bin: str | None = None, script_path: str | None = None) -> str:
+    py = python_bin or sys.executable
+    script = script_path or os.path.abspath(__file__)
+    args = [py, script, "--port", str(port)]
     # Token is resolved from TOKEN_FILE at startup, never in ProgramArguments
     if no_sound:
         args += ["--no-sound"]
@@ -90,11 +109,13 @@ def build_plist(port: int, token: str | None,
 
 def install_login(port: int, token: str | None,
                   no_sound: bool = False, sound_name: str | None = None,
-                  log_content: bool = False, allow_hosts: list[str] | None = None) -> None:
+                  log_content: bool = False, allow_hosts: list[str] | None = None,
+                  python_bin: str | None = None, script_path: str | None = None) -> None:
     os.makedirs(os.path.dirname(PLIST_PATH), exist_ok=True)
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     with open(PLIST_PATH, "w", encoding="utf-8") as fh:
-        fh.write(build_plist(port, token, no_sound, sound_name, log_content, allow_hosts))
+        fh.write(build_plist(port, token, no_sound, sound_name, log_content,
+                             allow_hosts, python_bin, script_path))
     os.chmod(PLIST_PATH, 0o600)
     # Pre-create log at 0600 so launchd inherits restrictive permissions
     fd = os.open(LOG_PATH, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
@@ -122,6 +143,37 @@ def uninstall_login() -> None:
 
 def login_installed() -> bool:
     return os.path.exists(PLIST_PATH)
+
+
+def uninstall_legacy_login() -> None:
+    """Retire the old launch.py login item so it stops competing for the port."""
+    if not os.path.exists(LEGACY_PLIST):
+        return
+    subprocess.run(["launchctl", "unload", LEGACY_PLIST],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        os.remove(LEGACY_PLIST)
+    except OSError:
+        pass
+    print(f"  ✓ Retired legacy login item → {LEGACY_PLIST}")
+
+
+def acquire_lock() -> bool:
+    """Single-instance guard: only one menu bar icon at a time."""
+    import fcntl
+    os.makedirs(os.path.dirname(LOCK_PATH), exist_ok=True)
+    try:
+        fh = open(LOCK_PATH, "w", encoding="utf-8")
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fh.seek(0)
+        fh.truncate()
+        fh.write(str(os.getpid()))
+        fh.flush()
+    except OSError:
+        return False
+    global _LOCK_HANDLE
+    _LOCK_HANDLE = fh
+    return True
 
 
 # ── Server start (shared by GUI + headless) ─────────────────────────────────
@@ -208,7 +260,7 @@ def _build_icon(app_dir: str) -> bool:
 
 
 def install_app() -> None:
-    """Copy the receiver, provision a rumps venv, and build ~/Applications/Whisper Bridge.app."""
+    """Copy the receiver, provision a rumps venv, build the app, and register login startup."""
     app_version = ""
     try:
         app_version = open(os.path.join(ROOT_DIR, "VERSION"), encoding="utf-8").read().strip()
@@ -241,6 +293,7 @@ def install_app() -> None:
     os.makedirs(macos_dir, exist_ok=True)
     launcher = os.path.join(macos_dir, APP_EXEC)
     menu_script = os.path.join(INSTALL_DIR, "mac-server", "menubar.py")
+    installed_script = menu_script
     with open(launcher, "w", encoding="utf-8") as fh:
         fh.write("#!/bin/bash\n")
         fh.write(f'exec "{venv_py}" "{menu_script}" "$@"\n')
@@ -270,8 +323,19 @@ def install_app() -> None:
         fh.write(plist)
     subprocess.run(["plutil", "-lint", plist_path], check=True)
 
+    # Retire the old launch.py service, restart from the installed copy, then
+    # register the menu bar app as the login item so it starts fresh.
+    uninstall_legacy_login()
+    subprocess.run(["pkill", "-f",
+                    "Application Support/WhisperBridge/mac-server/menubar.py"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    token = server.resolve_token(None)
+    install_login(server.DEFAULT_PORT, token,
+                  python_bin=venv_py, script_path=installed_script)
+
     print(f"  ✓ Installed menu bar app → {APP_DIR}")
-    print(f"  Double-click Whisper Bridge.app (or: open \"{APP_DIR}\")")
+    print("  ✓ Launch at login enabled (menu bar icon appears after every login)")
+    print("  The menu bar app is starting now — look for the mic icon top-right.")
 
 
 def remove_app() -> None:
@@ -286,13 +350,17 @@ def remove_app() -> None:
 
 def run_gui(cfg: dict, state: ServerState) -> None:
     port = cfg["port"]
+    print(f"[menubar] starting GUI on :{port} "
+          f"(python {sys.version.split()[0]}, rumps import pending)", flush=True)
     try:
         import rumps
     except ImportError:
+        print("[menubar] rumps not installed — running headless (no menu bar)", flush=True)
         print("  rumps not installed — running headless (no menu bar).")
         print("  For the menu bar: python3 mac-server/menubar.py --install-app")
         run_headless(port, state)
         return
+    print("[menubar] rumps ready — showing status item", flush=True)
 
     # Menu-bar only: no Dock icon, no Cmd-Tab entry.
     try:
@@ -454,6 +522,7 @@ def run_headless(port: int, state: ServerState) -> None:
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 def main() -> None:
+    _redirect_to_log()
     ap = argparse.ArgumentParser(description="Whisper Flow Bridge — menu bar")
     ap.add_argument("--port", type=int, default=server.DEFAULT_PORT)
     ap.add_argument("--token", default=None,
@@ -511,6 +580,9 @@ def main() -> None:
         "log_content": a.log_content,
         "allow_hosts": a.allow_host,
     }
+    if not acquire_lock():
+        print("  Whisper Bridge is already running in the menu bar.")
+        return
     state = ServerState(a.port, token, a.clipboard_only)
     if not state.start():
         print(f"  ✗ Could not bind :{a.port} — the menu bar will start in the stopped state.")

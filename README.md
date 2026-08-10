@@ -191,9 +191,10 @@ open "$HOME/Applications/Whisper Bridge.app"
 
 That copies the receiver into `~/Library/Application Support/WhisperBridge`,
 provisions a private Python runtime with `rumps`, and puts **Whisper
-Bridge.app** in `~/Applications` (menu bar only, no Dock icon). Re-run
-`--install-app` after pulling updates, and remove it with
-`python3 mac-server/menubar.py --remove-app`.
+Bridge.app** in `~/Applications` (menu bar only, no Dock icon). It also retires
+the old `launch.py` login item and registers the menu bar app as the login item,
+so the 🎙 icon is there after every login. Re-run `--install-app` after pulling
+updates, and remove the app with `python3 mac-server/menubar.py --remove-app`.
 
 The bridge starts automatically when the app opens. Use **Stop bridge** to take
 it offline without quitting, **Start bridge** to bring it back, and
@@ -202,6 +203,7 @@ choice when you also want the floating desktop overlay.
 
 If you previously installed the `launch.py` login item, remove it first so the
 two don't compete for port `9877`: `python3 mac-server/launch.py --uninstall-login`.
+`--install-app` does this automatically.
 
 ## Troubleshooting
 
