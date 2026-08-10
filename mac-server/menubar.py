@@ -4,7 +4,9 @@ Whisper Flow Bridge — menu-bar companion (macOS).
 
 Runs the bridge server in the background and shows a status item in the menu
 bar with live LAN / Tailscale addresses, the last dictation, and quick actions
-(open console, copy pairing link). Optionally installs itself as a login item.
+(open console, copy pairing link), plus one-click Start / Stop for the bridge
+and a Launch-at-login toggle. Optionally installs itself as a login item or as
+a double-clickable app in ~/Applications.
 
 The server engine (server.py) stays dependency-free; this wrapper needs `rumps`
 for the menu bar (pip3 install rumps). If rumps is missing it falls back to
@@ -15,11 +17,14 @@ Usage:
     python3 menubar.py --token SECRET        # require a shared secret (remote-safe)
     python3 menubar.py --install-login       # launch at login (RunAtLoad)
     python3 menubar.py --uninstall-login     # remove the login item
+    python3 menubar.py --install-app         # build ~/Applications/Whisper Bridge.app
+    python3 menubar.py --remove-app          # remove the menu-bar app
     python3 menubar.py --print-plist         # print the LaunchAgent plist (no side effects)
 """
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -43,6 +48,9 @@ def status_dot(bound: bool, tail_ip) -> str:
 LABEL = "com.whisperbridge.menubar"
 PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{LABEL}.plist")
 LOG_PATH = os.path.expanduser("~/Library/Logs/whisperbridge-menubar.log")
+INSTALL_DIR = os.path.expanduser("~/Library/Application Support/WhisperBridge")
+APP_DIR = os.path.expanduser("~/Applications/Whisper Bridge.app")
+APP_EXEC = "whisper-bridge-menubar"
 
 
 # ── Login item (LaunchAgent) ────────────────────────────────────────────────
@@ -112,6 +120,10 @@ def uninstall_login() -> None:
         print("  (no login item installed)")
 
 
+def login_installed() -> bool:
+    return os.path.exists(PLIST_PATH)
+
+
 # ── Server start (shared by GUI + headless) ─────────────────────────────────
 
 def start_server(port: int, token: str | None, clipboard_only: bool):
@@ -128,15 +140,158 @@ def start_server(port: int, token: str | None, clipboard_only: bool):
     return httpd
 
 
+# ── Mutable server state (Start / Stop from the menu) ───────────────────────
+
+class ServerState:
+    """Owns the HTTP server so the menu bar can start and stop it repeatedly."""
+
+    def __init__(self, port: int, token: str | None, clipboard_only: bool):
+        self.port = port
+        self.token = token
+        self.clipboard_only = clipboard_only
+        self.httpd = None
+
+    def is_running(self) -> bool:
+        return self.httpd is not None
+
+    def start(self) -> bool:
+        if self.is_running():
+            return True
+        httpd = start_server(self.port, self.token, self.clipboard_only)
+        if httpd is None:
+            return False
+        self.httpd = httpd
+        return True
+
+    def stop(self) -> None:
+        httpd = self.httpd
+        if httpd is None:
+            return
+        self.httpd = None
+        try:
+            httpd.shutdown()
+        finally:
+            httpd.server_close()
+
+
+# ── Menu-bar app bundle ─────────────────────────────────────────────────────
+
+def _build_icon(app_dir: str) -> bool:
+    """Render branding/icon-1024.png into AppIcon.icns for the app bundle."""
+    src = os.path.join(ROOT_DIR, "branding", "icon-1024.png")
+    if not os.path.exists(src):
+        return False
+    import tempfile
+    work = tempfile.mkdtemp(prefix="whisperbridge-icon-")
+    iconset = os.path.join(work, "AppIcon.iconset")
+    os.makedirs(iconset)
+    try:
+        for size in (16, 32, 128, 256, 512):
+            name = f"icon_{size}x{size}.png"
+            subprocess.run(["sips", "-z", str(size), str(size), src, "--out",
+                            os.path.join(iconset, name)],
+                           check=True, capture_output=True)
+            subprocess.run(["sips", "-z", str(size * 2), str(size * 2), src, "--out",
+                            os.path.join(iconset, f"icon_{size}x{size}@2x.png")],
+                           check=True, capture_output=True)
+        resources = os.path.join(app_dir, "Contents", "Resources")
+        os.makedirs(resources, exist_ok=True)
+        subprocess.run(["iconutil", "-c", "icns", iconset,
+                        "-o", os.path.join(resources, "AppIcon.icns")],
+                       check=True, capture_output=True)
+        return True
+    except Exception as exc:
+        print(f"  (icon skipped: {exc})")
+        return False
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def install_app() -> None:
+    """Copy the receiver, provision a rumps venv, and build ~/Applications/Whisper Bridge.app."""
+    app_version = ""
+    try:
+        app_version = open(os.path.join(ROOT_DIR, "VERSION"), encoding="utf-8").read().strip()
+    except OSError:
+        pass
+    version = app_version or "1.0"
+
+    os.makedirs(INSTALL_DIR, exist_ok=True)
+    if ROOT_DIR != INSTALL_DIR:
+        subprocess.run(["ditto", os.path.join(ROOT_DIR, "common"),
+                        os.path.join(INSTALL_DIR, "common")], check=True)
+        subprocess.run(["ditto", os.path.join(ROOT_DIR, "mac-server"),
+                        os.path.join(INSTALL_DIR, "mac-server")], check=True)
+    else:
+        print("  Already installed — refreshing the app bundle only.")
+
+    venv_dir = os.path.join(INSTALL_DIR, "menubar-venv")
+    venv_py = os.path.join(venv_dir, "bin", "python3")
+    if not os.path.exists(venv_py):
+        print("  Creating the menu-bar runtime…")
+        subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
+    try:
+        subprocess.run([venv_py, "-c", "import rumps"], check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        print("  Installing rumps into the menu-bar runtime…")
+        subprocess.run([os.path.join(venv_dir, "bin", "pip"), "install", "-q", "rumps"],
+                       check=True)
+
+    macos_dir = os.path.join(APP_DIR, "Contents", "MacOS")
+    os.makedirs(macos_dir, exist_ok=True)
+    launcher = os.path.join(macos_dir, APP_EXEC)
+    menu_script = os.path.join(INSTALL_DIR, "mac-server", "menubar.py")
+    with open(launcher, "w", encoding="utf-8") as fh:
+        fh.write("#!/bin/bash\n")
+        fh.write(f'exec "{venv_py}" "{menu_script}" "$@"\n')
+    os.chmod(launcher, 0o755)
+
+    has_icon = _build_icon(APP_DIR)
+    icon_key = '  <key>CFBundleIconFile</key><string>AppIcon</string>\n' if has_icon else ""
+    plist = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0"><dict>\n'
+        '  <key>CFBundleName</key><string>Whisper Bridge</string>\n'
+        '  <key>CFBundleDisplayName</key><string>Whisper Bridge</string>\n'
+        '  <key>CFBundleIdentifier</key><string>com.whisperbridge.menubar</string>\n'
+        f'  <key>CFBundleShortVersionString</key><string>{version}</string>\n'
+        f'  <key>CFBundleVersion</key><string>{version}</string>\n'
+        f'  <key>CFBundleExecutable</key><string>{APP_EXEC}</string>\n'
+        '  <key>CFBundlePackageType</key><string>APPL</string>\n'
+        '  <key>LSUIElement</key><true/>\n'
+        '  <key>NSHighResolutionCapable</key><true/>\n'
+        f'{icon_key}'
+        '</dict></plist>\n'
+    )
+    plist_path = os.path.join(APP_DIR, "Contents", "Info.plist")
+    with open(plist_path, "w", encoding="utf-8") as fh:
+        fh.write(plist)
+    subprocess.run(["plutil", "-lint", plist_path], check=True)
+
+    print(f"  ✓ Installed menu bar app → {APP_DIR}")
+    print(f"  Double-click Whisper Bridge.app (or: open \"{APP_DIR}\")")
+
+
+def remove_app() -> None:
+    if os.path.isdir(APP_DIR):
+        shutil.rmtree(APP_DIR)
+        print(f"  ✓ Removed menu bar app → {APP_DIR}")
+    else:
+        print("  (no menu bar app installed)")
+
+
 # ── Menu bar (rumps) ────────────────────────────────────────────────────────
 
-def run_gui(port: int, httpd) -> None:
+def run_gui(cfg: dict, state: ServerState) -> None:
+    port = cfg["port"]
     try:
         import rumps
     except ImportError:
         print("  rumps not installed — running headless (no menu bar).")
-        print("  For the menu bar: pip3 install rumps")
-        run_headless(port, httpd)
+        print("  For the menu bar: python3 mac-server/menubar.py --install-app")
+        run_headless(port, state)
         return
 
     # Menu-bar only: no Dock icon, no Cmd-Tab entry.
@@ -163,22 +318,65 @@ def run_gui(port: int, httpd) -> None:
     class BridgeApp(rumps.App):
         def __init__(self):
             super().__init__("🎙", quit_button=None)
-            self.title = status_dot(bool(httpd), server.get_tail_ip()) + "🎙"
-            self.header = rumps.MenuItem(
-                "Whisper Bridge — running" if httpd else "Whisper Bridge — port busy",
-                callback=None)
+            self.header = rumps.MenuItem("Whisper Bridge", callback=None)
+            self.toggle = rumps.MenuItem("Start bridge", callback=self.on_toggle)
             self.lan = rumps.MenuItem("LAN: …", callback=self.on_lan)
             self.tail = rumps.MenuItem("Tailscale: …", callback=self.on_tail)
             self.tok = rumps.MenuItem("Token: …", callback=None)
             self.last = rumps.MenuItem("Last: —", callback=None)
+            self.login = rumps.MenuItem("Launch at login", callback=self.on_login)
             self.menu = [
-                self.header, self.lan, self.tail, self.tok, rumps.separator,
+                self.header, self.toggle, rumps.separator,
+                self.lan, self.tail, self.tok, rumps.separator,
                 self.last, rumps.separator,
                 rumps.MenuItem("Open console", callback=self.on_open),
                 rumps.MenuItem("Copy pairing link", callback=self.on_pair),
                 rumps.separator,
+                self.login, rumps.separator,
                 rumps.MenuItem("Quit Whisper Bridge", callback=self.on_quit),
             ]
+            self.refresh_ui()
+
+        def refresh_ui(self):
+            running = state.is_running()
+            tail = server.get_tail_ip()
+            self.title = status_dot(running, tail) + "🎙"
+            if running:
+                self.header.title = (
+                    "Whisper Bridge — ready (LAN + Tailscale)" if tail
+                    else "Whisper Bridge — ready (LAN only)")
+            else:
+                self.header.title = "Whisper Bridge — stopped"
+            self.toggle.title = "Stop bridge" if running else "Start bridge"
+            self.login.title = "Launch at login: " + ("On" if login_installed() else "Off")
+
+        def on_toggle(self, _):
+            if state.is_running():
+                state.stop()
+                rumps.notification(
+                    "Whisper Bridge", "Bridge stopped",
+                    f":{port} is no longer accepting connections")
+            else:
+                if state.start():
+                    rumps.notification(
+                        "Whisper Bridge", "Bridge started",
+                        f"Listening on :{port}" + (" · token on" if cfg["token"] else ""))
+                else:
+                    rumps.notification(
+                        "Whisper Bridge", "Could not start",
+                        f"Port {port} is busy — is the bridge already running?")
+            self.refresh_ui()
+
+        def on_login(self, _):
+            if login_installed():
+                uninstall_login()
+            else:
+                install_login(port, cfg["token"], cfg["no_sound"], cfg["sound_name"],
+                              cfg["log_content"], cfg["allow_hosts"])
+            self.refresh_ui()
+            rumps.notification(
+                "Whisper Bridge", "Launch at login " +
+                ("disabled" if not login_installed() else "enabled"), "")
 
         def on_lan(self, _):
             if copy(f"{server.get_lan_ip()}:{port}"):
@@ -190,6 +388,10 @@ def run_gui(port: int, httpd) -> None:
                 rumps.notification("Whisper Bridge", "Tailscale address copied", "")
 
         def on_open(self, _):
+            if not state.is_running():
+                rumps.notification("Whisper Bridge", "Bridge is stopped",
+                                   "Choose Start bridge first.")
+                return
             tok = server.AUTH_TOKEN
             url = f"http://localhost:{port}"
             if tok:
@@ -197,6 +399,10 @@ def run_gui(port: int, httpd) -> None:
             webbrowser.open(url)
 
         def on_pair(self, _):
+            if not state.is_running():
+                rumps.notification("Whisper Bridge", "Bridge is stopped",
+                                   "Choose Start bridge first.")
+                return
             p, host = pair_link()
             if copy(p):
                 rumps.notification("Whisper Bridge", "Pairing link copied", host)
@@ -218,25 +424,25 @@ def run_gui(port: int, httpd) -> None:
                     self.last.title = f"Last ({st['count']}): {st['last_preview'] or '—'}"
                 else:
                     self.last.title = "Last: —"
-                self.title = status_dot(bool(httpd), tail) + "🎙"
-                self.header.title = (
-                    "Whisper Bridge — ready (LAN + Tailscale)" if (httpd and tail)
-                    else "Whisper Bridge — ready (LAN only)" if httpd
-                    else "Whisper Bridge — port busy")
+                self.refresh_ui()
             except Exception:
                 pass
 
     app = BridgeApp()
-    rumps.notification("Whisper Bridge", "Running in the menu bar",
-                       f":{port}" + (" · token on" if server.AUTH_TOKEN else ""))
+    if state.is_running():
+        rumps.notification("Whisper Bridge", "Running in the menu bar",
+                           f":{port}" + (" · token on" if cfg["token"] else ""))
+    else:
+        rumps.notification("Whisper Bridge", "Bridge is stopped",
+                           "Use the menu item to start it.")
     app.run()
 
 
-def run_headless(port: int, httpd) -> None:
-    if httpd is None:
+def run_headless(port: int, state: ServerState) -> None:
+    if not state.is_running():
         sys.exit(1)
     print(f"  Whisper Bridge headless on 0.0.0.0:{port} "
-          f"(token {'set' if server.AUTH_TOKEN else 'none'})")
+          f"(token {'set' if state.token else 'none'})")
     print("  Waiting for text from Android… (Ctrl-C to stop)\n")
     try:
         while True:
@@ -260,6 +466,10 @@ def main() -> None:
     ap.add_argument("--install-login", action="store_true",
                     help="Install a LaunchAgent that runs this at login.")
     ap.add_argument("--uninstall-login", action="store_true")
+    ap.add_argument("--install-app", action="store_true",
+                    help="Build the double-clickable menu-bar app in ~/Applications.")
+    ap.add_argument("--remove-app", action="store_true",
+                    help="Remove the menu-bar app from ~/Applications.")
     ap.add_argument("--print-plist", action="store_true",
                     help="Print the LaunchAgent plist to stdout (no side effects).")
     a = ap.parse_args()
@@ -278,6 +488,12 @@ def main() -> None:
     if a.print_plist:
         sys.stdout.write(build_plist(a.port, token, no_sound, sound_name, a.log_content, a.allow_host))
         return
+    if a.install_app:
+        install_app()
+        return
+    if a.remove_app:
+        remove_app()
+        return
     if a.install_login:
         install_login(a.port, token, no_sound, sound_name, a.log_content, a.allow_host)
         return
@@ -287,8 +503,18 @@ def main() -> None:
 
     server.configure_allowed_hosts(a.allow_host)
     server.start_allowed_hosts_refresher()
-    httpd = start_server(a.port, token, a.clipboard_only)
-    run_gui(a.port, httpd)
+    cfg = {
+        "port": a.port,
+        "token": token,
+        "no_sound": no_sound,
+        "sound_name": sound_name,
+        "log_content": a.log_content,
+        "allow_hosts": a.allow_host,
+    }
+    state = ServerState(a.port, token, a.clipboard_only)
+    if not state.start():
+        print(f"  ✗ Could not bind :{a.port} — the menu bar will start in the stopped state.")
+    run_gui(cfg, state)
 
 
 if __name__ == "__main__":

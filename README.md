@@ -177,14 +177,31 @@ curl -H "Authorization: Bearer $(cat ~/.config/whisperbridge/token)" -H 'Content
   http://<tailnet-ip>:9877/send
 ```
 
-## Menu Bar App (always-on, launches at login)
+## Menu Bar App (start/stop with one click)
 
-`menubar.py` runs the bridge in the background and puts a 🎙 status item in your menu bar showing the live **LAN** and **Tailscale** addresses, the token state, and the last dictation — with one-click *Open console*, *Copy pairing link*, and *Quit*. The `launch.py` script is recommended for most users since it includes the floating overlay.
+`menubar.py` runs the bridge with a 🎙 status item: one click **Stop bridge** /
+**Start bridge**, plus live **LAN** and **Tailscale** addresses, the last
+dictation, *Open console*, *Copy pairing link*, a **Launch at login** toggle,
+and *Quit*. Build the double-clickable app once:
 
 ```bash
-pip3 install rumps            # one-time; pulls PyObjC for the menu bar
-python3 mac-server/menubar.py
+python3 mac-server/menubar.py --install-app
+open "$HOME/Applications/Whisper Bridge.app"
 ```
+
+That copies the receiver into `~/Library/Application Support/WhisperBridge`,
+provisions a private Python runtime with `rumps`, and puts **Whisper
+Bridge.app** in `~/Applications` (menu bar only, no Dock icon). Re-run
+`--install-app` after pulling updates, and remove it with
+`python3 mac-server/menubar.py --remove-app`.
+
+The bridge starts automatically when the app opens. Use **Stop bridge** to take
+it offline without quitting, **Start bridge** to bring it back, and
+**Launch at login** to keep it available after reboot. `launch.py` remains the
+choice when you also want the floating desktop overlay.
+
+If you previously installed the `launch.py` login item, remove it first so the
+two don't compete for port `9877`: `python3 mac-server/launch.py --uninstall-login`.
 
 ## Troubleshooting
 
