@@ -399,6 +399,7 @@ def run_gui(cfg: dict, state: ServerState) -> None:
                 self.last, rumps.separator,
                 rumps.MenuItem("Open console", callback=self.on_open),
                 rumps.MenuItem("Copy pairing link", callback=self.on_pair),
+                rumps.MenuItem("Refresh status", callback=self.on_refresh),
                 rumps.separator,
                 self.login, rumps.separator,
                 rumps.MenuItem("Quit Whisper Bridge", callback=self.on_quit),
@@ -417,6 +418,26 @@ def run_gui(cfg: dict, state: ServerState) -> None:
                 self.header.title = "Whisper Bridge — stopped"
             self.toggle.title = "Stop bridge" if running else "Start bridge"
             self.login.title = "Launch at login: " + ("On" if login_installed() else "Off")
+            if tail:
+                self.tail.title = f"Tailscale: {tail}:{port}  ⧉"
+            else:
+                self.tail.title = "Tailscale: not connected"
+
+        def on_refresh(self, _):
+            self.tail.title = "Tailscale: checking…"
+            self.lan.title = "LAN: checking…"
+            # Force a fresh probe, bypassing the 15s cache.
+            tail = server.get_tail_ip(force=True)
+            lan = server.get_lan_ip()
+            if tail:
+                self.tail.title = f"Tailscale: {tail}:{port}  ⧉"
+            else:
+                self.tail.title = "Tailscale: not connected"
+            self.lan.title = f"LAN: {lan}:{port}  ⧉"
+            self.refresh_ui()
+            rumps.notification(
+                "Whisper Bridge", "Status refreshed",
+                f"Tailscale: {tail or 'not connected'}  ·  LAN: {lan}")
 
         def on_toggle(self, _):
             if state.is_running():
@@ -482,10 +503,11 @@ def run_gui(cfg: dict, state: ServerState) -> None:
         def refresh(self, _):
             try:
                 lan = server.get_lan_ip()
-                tail = server.get_tail_ip()
+                # Cached probe normally; force a fresh one only when the last
+                # result was offline so a transient miss recovers on its own.
+                tail = server.get_tail_ip(
+                    force=self.tail.title == "Tailscale: not connected")
                 self.lan.title = f"LAN: {lan}:{port}  ⧉"
-                self.tail.title = (f"Tailscale: {tail}:{port}  ⧉" if tail
-                                   else "Tailscale: not connected")
                 self.tok.title = "Token: set · remote-safe"
                 st = server.STATUS
                 if st["count"]:
