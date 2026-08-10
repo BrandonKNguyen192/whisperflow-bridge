@@ -39,12 +39,6 @@ ROOT_DIR = os.path.dirname(MAC_DIR)
 sys.path.insert(0, ROOT_DIR)
 from common import bridge_server as server  # noqa: E402
 
-def status_dot(bound: bool, tail_ip) -> str:
-    """Menu-bar glyph: 🟢 ready incl. Tailscale · 🟡 LAN only · 🔴 not listening."""
-    if not bound:
-        return "🔴"
-    return "🟢" if tail_ip else "🟡"
-
 LABEL = "com.whisperbridge.menubar"
 PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{LABEL}.plist")
 LOG_PATH = os.path.expanduser("~/Library/Logs/whisperbridge-menubar.log")
@@ -231,6 +225,18 @@ class ServerState:
 
 # ── Menu-bar app bundle ─────────────────────────────────────────────────────
 
+def _menubar_icon_path() -> str | None:
+    """Template mic glyph shipped with the repo/install; None falls back to text."""
+    candidates = [
+        os.path.join(ROOT_DIR, "branding", "menubar-icon.png"),
+        os.path.join(INSTALL_DIR, "branding", "menubar-icon.png"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def _build_icon(app_dir: str) -> bool:
     """Render branding/icon-1024.png into AppIcon.icns for the app bundle."""
     src = os.path.join(ROOT_DIR, "branding", "icon-1024.png")
@@ -277,6 +283,8 @@ def install_app() -> None:
                         os.path.join(INSTALL_DIR, "common")], check=True)
         subprocess.run(["ditto", os.path.join(ROOT_DIR, "mac-server"),
                         os.path.join(INSTALL_DIR, "mac-server")], check=True)
+        subprocess.run(["ditto", os.path.join(ROOT_DIR, "branding"),
+                        os.path.join(INSTALL_DIR, "branding")], check=True)
     else:
         print("  Already installed — refreshing the app bundle only.")
 
@@ -388,7 +396,16 @@ def run_gui(cfg: dict, state: ServerState) -> None:
 
     class BridgeApp(rumps.App):
         def __init__(self):
-            super().__init__("🎙", quit_button=None)
+            icon = _menubar_icon_path()
+            print(f"[menubar] menu bar icon: {icon or 'none (emoji fallback)'}",
+                  flush=True)
+            super().__init__(
+                "Whisper Bridge",
+                title="" if icon else "🎙",
+                icon=icon,
+                template=True,
+                quit_button=None,
+            )
             self.header = rumps.MenuItem("Whisper Bridge", callback=None)
             self.toggle = rumps.MenuItem("Start bridge", callback=self.on_toggle)
             self.lan = rumps.MenuItem("LAN: …", callback=self.on_lan)
@@ -412,7 +429,6 @@ def run_gui(cfg: dict, state: ServerState) -> None:
         def refresh_ui(self):
             running = state.is_running()
             tail = server.get_tail_ip()
-            self.title = status_dot(running, tail) + "🎙"
             if running:
                 self.header.title = (
                     "Whisper Bridge — ready (LAN + Tailscale)" if tail
