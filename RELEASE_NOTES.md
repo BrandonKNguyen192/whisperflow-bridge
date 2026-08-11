@@ -7,6 +7,7 @@ Whisper Bridge lets you dictate with Wispr Flow on Android and send the result t
 - **iOS air mouse:** Hold-to-activate gyroscope mouse on the iPhone/iPad client — tilt the phone to steer the cursor, with sensitivity and direction-invert settings. Mirrors the Android air mouse.
 - **iPhone 17 Pro Max verified end-to-end:** The iOS client now works on current iOS betas (27) over Tailscale and the home LAN, including live typing, mouse control, and pairing.
 - **Frosted glass Android UI (build 42):** Ambient accent and brand color blobs drift behind translucent frosted cards, inputs, and the trackpad; the Settings bottom sheet and dialogs use real window backdrop blur on Android 12+, and the Earth theme maps to warm translucent ivory.
+- **macOS menu bar app:** A double-clickable Whisper Bridge app (menu bar only, no Dock icon) with one-click Start/Stop, live LAN/Tailscale status, a Launch-at-login toggle, and a brand mic icon. `python3 mac-server/menubar.py --install-app` installs it and retires the old `launch.py` login item automatically.
 
 ## Improvements
 
@@ -14,6 +15,7 @@ Whisper Bridge lets you dictate with Wispr Flow on Android and send the result t
 - **iOS transport bypasses ATS.** The iOS client now speaks HTTP/1.0 over a raw TCP socket (Network.framework) instead of URLSession. App Transport Security on current iOS betas rejects plain HTTP to Tailscale/LAN IPs even with exceptions set; raw sockets are not policed by ATS, so the receiver's plain-HTTP design keeps working everywhere.
 - **iOS Liquid Glass + spring motion (builds 39-40).** Layered translucent materials, an ambient drifting background, springy chip and button motion, and haptics across the iPhone/iPad client.
 - **Android Material Expressive motion (builds 39-40).** Spring press, entrance, and breathing micro-interactions, plus outline-free tonal buttons for a cleaner, more fluid feel.
+- **Menu bar reliability:** Tailscale detection no longer depends on PATH when launched by launchd/Finder (absolute binary lookup), a stale "not connected" label recovers automatically and via a Refresh status item, and a single-instance lock prevents duplicate menu bar icons.
 - **Verified on physical hardware:** Python 3.12 + the receiver were installed on a Windows mini-PC (Beelink) over Tailscale SSH; a live Notepad round-trip test confirmed typing lands exactly, and the Windows backend unit suite (10 tests) passes on the machine.
 
 ## Bug Fixes
