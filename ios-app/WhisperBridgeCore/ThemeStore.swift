@@ -4,6 +4,7 @@ import Foundation
 public enum ThemeMode: String, CaseIterable, Identifiable {
     case light
     case earth
+    case genie = "genie"
     case darkOLED = "dark_oled"
     case system
 
@@ -13,6 +14,7 @@ public enum ThemeMode: String, CaseIterable, Identifiable {
         switch self {
         case .light: return "Light"
         case .earth: return "Earth"
+        case .genie: return "Genie"
         case .darkOLED: return "Dark OLED"
         case .system: return "System"
         }
@@ -34,7 +36,7 @@ public final class ThemeStore: ObservableObject {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.mode = ThemeMode(rawValue: defaults.string(forKey: Keys.mode) ?? "") ?? .system
+        self.mode = ThemeMode(rawValue: defaults.string(forKey: Keys.mode) ?? "") ?? .genie
         self.accentHex = defaults.string(forKey: Keys.accent) ?? Self.defaultAccent
     }
 

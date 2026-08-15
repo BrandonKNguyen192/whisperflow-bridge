@@ -10,6 +10,12 @@ typography with size-aware tracking, translucent "glass" materials on the web,
 pure-black OLED support, hairline borders, generous whitespace, and motion that
 starts on press and respects reduced-motion settings.
 
+As of the v1.3 **Genie** refresh, the signature look is a premium "AI
+assistant" identity: a deep royal-blue gradient backdrop, dark-navy glass
+cards, and a warm gold accent. It is the default theme on every surface (web
+console, Android, iOS) and can be switched in Settings alongside Light, Earth,
+and Dark OLED.
+
 ## Brand mark
 
 The mascot is a smiling microphone under a blue → green → amber "bridge" arc
@@ -84,6 +90,31 @@ Motion starts on press and reinforces where the user's finger is:
 | grad-green       | `#34C77B` | gradient stop 2                      |
 | grad-amber       | `#F2C14E` | gradient stop 3                      |
 | ok / err / idle  | green / `#D14343` / `#B6B4AC` | status states        |
+
+### Genie (v1.3 signature, default)
+
+| Token            | Hex       | Use                                  |
+|------------------|-----------|--------------------------------------|
+| bg (dark)        | `#061029` | deep navy page background            |
+| bg-top (dark)    | `#0A2C6B` | royal-blue gradient top              |
+| surface          | `#09183A` | sidebar / panels                     |
+| card             | `#0D1C40` | glass cards                          |
+| input            | `#112350` | inputs / trackpad pad                |
+| ink              | `#F2F5FF` | primary text                         |
+| text-2           | `#A9B4D6` | secondary text                       |
+| text-3           | `#71809F` | tertiary / micro labels              |
+| border           | `#405482` | hairlines                            |
+| chip             | `#182A56` | tag / count chips                    |
+| accent (gold)    | `#D9B36A` | primary / links / live dot           |
+| accent-soft      | `rgba(217,179,106,.15)` | selected pill bg / callouts |
+| grad-blue        | `#3E7BFF` | gradient stop 1                      |
+| grad-sky         | `#6FA0FF` | gradient stop 2                      |
+| grad-gold        | `#D9B36A` | gradient stop 3                      |
+
+Light-mode Genie uses a warm cream canvas (`#F4EFE6`) with the same gold accent
+and terracotta→gold gradient stops, so the identity reads consistently in both
+schemes. The accent line under headers becomes a `royal-blue → sky → gold`
+gradient in Genie mode.
 
 Radii: card `18`, input `14`, pill `999`, thumb `10`.
 Type scale: display `34–56/-3%`, title `20–24/700/-2%`, label

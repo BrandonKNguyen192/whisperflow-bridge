@@ -384,6 +384,7 @@ class MainActivity : AppCompatActivity() {
 
         // ── Theme mode chips ─────────────────────────────────────
         val themeModes = listOf(
+            Pair("Genie", ThemeManager.ThemeMode.GENIE),
             Pair("Light", ThemeManager.ThemeMode.LIGHT),
             Pair("Earth", ThemeManager.ThemeMode.EARTH),
             Pair("Dark OLED", ThemeManager.ThemeMode.DARK_OLED),
@@ -574,7 +575,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         MotionKit.installSpringPressRecursive(root)
-        if (ThemeManager.isEarth(this)) {
+        if (ThemeManager.hasCustomPalette(this)) {
             ThemeManager.applyEarthPalette(root)
         }
         ThemeManager.setupAmbient(root.findViewById(R.id.ambientLayer))
@@ -587,10 +588,10 @@ class MainActivity : AppCompatActivity() {
                 // Frosted sheet over a real blurred backdrop on Android 12+;
                 // older devices fall back to a heavier dim.
                 it.setBackgroundColor(
-                    if (ThemeManager.isEarth(this)) {
-                        Color.argb(200, 251, 248, 241)
-                    } else {
-                        ContextCompat.getColor(this, R.color.glass_card)
+                    when {
+                        ThemeManager.isGenie(this) -> Color.argb(210, 13, 28, 64)
+                        ThemeManager.isEarth(this) -> Color.argb(200, 251, 248, 241)
+                        else -> ContextCompat.getColor(this, R.color.glass_card)
                     }
                 )
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

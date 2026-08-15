@@ -64,6 +64,21 @@ struct AppPalette {
         statusIdle: Color(hex: "#A89D8A")
     )
 
+    // Genie — the signature "AI assistant" look: deep royal-blue backdrop,
+    // dark-navy glass cards, gold accent. Always renders in dark.
+    static let genie = AppPalette(
+        background: Color(hex: "#061029"),
+        surface: Color(hex: "#09183A"),
+        card: Color(hex: "#0D1C40"),
+        input: Color(hex: "#112350"),
+        textPrimary: Color(hex: "#F2F5FF"),
+        textSecondary: Color(hex: "#A9B4D6"),
+        textTertiary: Color(hex: "#71809F"),
+        border: Color(hex: "#405482"),
+        chip: Color(hex: "#182A56"),
+        statusIdle: Color(hex: "#5A688C")
+    )
+
     static let dark = AppPalette(
         background: .black,
         surface: Color(hex: "#0D0D0F"),
@@ -81,6 +96,7 @@ struct AppPalette {
         switch mode {
         case .light: return .light
         case .earth: return .earth
+        case .genie: return .genie
         case .darkOLED: return .dark
         case .system:
             return UITraitCollection.current.userInterfaceStyle == .dark ? .dark : .light
@@ -90,6 +106,7 @@ struct AppPalette {
 
 enum Accents {
     static let options: [(name: String, hex: String)] = [
+        ("Genie Gold", "#D9B36A"),
         ("Sage", "#2E7D46"),
         ("Sky", "#0EA5E9"),
         ("Rose", "#E11D48"),
@@ -101,7 +118,7 @@ enum Accents {
     ]
 
     static func soft(_ hex: String, mode: ThemeMode) -> Color {
-        let isDark = mode == .darkOLED
+        let isDark = mode == .darkOLED || mode == .genie
             || (mode == .system && UITraitCollection.current.userInterfaceStyle == .dark)
         return Color(hex: hex).opacity(isDark ? 0.28 : 0.14)
     }

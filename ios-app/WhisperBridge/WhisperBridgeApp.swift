@@ -30,7 +30,7 @@ struct WhisperBridgeApp: App {
 
     private var colorScheme: ColorScheme? {
         switch theme.mode {
-        case .darkOLED: return .dark
+        case .genie, .darkOLED: return .dark
         case .light, .earth: return .light
         case .system: return nil
         }

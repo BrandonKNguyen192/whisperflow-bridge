@@ -30,12 +30,14 @@ object ThemeManager {
     enum class ThemeMode(val value: String) {
         LIGHT("light"),
         EARTH("earth"),
+        GENIE("genie"),
         DARK_OLED("dark_oled"),
         SYSTEM("system")
     }
 
     data class Palette(
         val background: Int,
+        val backgroundTop: Int = background,
         val surface: Int,
         val card: Int,
         val input: Int,
@@ -51,6 +53,7 @@ object ThemeManager {
 
     private val earthPalette = Palette(
         background = Color.rgb(241, 238, 230),
+        backgroundTop = Color.rgb(246, 243, 235),
         surface = Color.rgb(232, 227, 216),
         card = Color.rgb(251, 248, 241),
         input = Color.rgb(247, 243, 235),
@@ -64,12 +67,31 @@ object ThemeManager {
         greenSoft = Color.rgb(232, 235, 219)
     )
 
+    // Genie — the signature "AI assistant" look: deep royal-blue gradient
+    // backdrop, dark-navy glass cards, gold accent. Always renders dark.
+    private val geniePalette = Palette(
+        background = Color.rgb(6, 16, 41),
+        backgroundTop = Color.rgb(10, 44, 107),
+        surface = Color.rgb(9, 24, 58),
+        card = Color.rgb(13, 28, 64),
+        input = Color.rgb(17, 35, 80),
+        textPrimary = Color.rgb(242, 245, 255),
+        textSecondary = Color.rgb(169, 180, 214),
+        textTertiary = Color.rgb(113, 128, 159),
+        border = Color.rgb(64, 84, 130),
+        chip = Color.rgb(24, 42, 86),
+        neutral = Color.rgb(110, 123, 160),
+        statusIdle = Color.rgb(90, 104, 140),
+        greenSoft = Color.rgb(38, 52, 96)
+    )
+
     data class AccentOption(
         val name: String,
         val hex: String
     )
 
     val accentOptions = listOf(
+        AccentOption("Genie Gold", "#D9B36A"),
         AccentOption("Sage", "#2E7D46"),
         AccentOption("Sky", "#0EA5E9"),
         AccentOption("Rose", "#E11D48"),
@@ -89,16 +111,20 @@ object ThemeManager {
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun getThemeMode(ctx: Context): ThemeMode {
-        val raw = prefs(ctx).getString(KEY_THEME_MODE, ThemeMode.SYSTEM.value) ?: ThemeMode.SYSTEM.value
-        return ThemeMode.entries.find { it.value == raw } ?: ThemeMode.SYSTEM
+        val raw = prefs(ctx).getString(KEY_THEME_MODE, ThemeMode.GENIE.value) ?: ThemeMode.GENIE.value
+        return ThemeMode.entries.find { it.value == raw } ?: ThemeMode.GENIE
     }
 
     fun setThemeMode(ctx: Context, mode: ThemeMode) {
         prefs(ctx).edit().putString(KEY_THEME_MODE, mode.value).apply()
     }
 
-    fun getAccentHex(ctx: Context): String =
-        prefs(ctx).getString(KEY_ACCENT_HEX, DEFAULT_ACCENT) ?: DEFAULT_ACCENT
+    fun getAccentHex(ctx: Context): String {
+        val stored = prefs(ctx).getString(KEY_ACCENT_HEX, null)
+        if (stored != null) return stored
+        // Theme-appropriate default: gold for the Genie look, sage otherwise.
+        return if (getThemeMode(ctx) == ThemeMode.GENIE) "#D9B36A" else DEFAULT_ACCENT
+    }
 
     fun setAccentHex(ctx: Context, hex: String) {
         prefs(ctx).edit().putString(KEY_ACCENT_HEX, hex).apply()
@@ -109,6 +135,7 @@ object ThemeManager {
         val mode = when (getThemeMode(ctx)) {
             ThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
             ThemeMode.EARTH -> AppCompatDelegate.MODE_NIGHT_NO
+            ThemeMode.GENIE -> AppCompatDelegate.MODE_NIGHT_YES
             ThemeMode.DARK_OLED -> AppCompatDelegate.MODE_NIGHT_YES
             ThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
@@ -117,22 +144,49 @@ object ThemeManager {
 
     fun isEarth(ctx: Context): Boolean = getThemeMode(ctx) == ThemeMode.EARTH
 
+    fun isGenie(ctx: Context): Boolean = getThemeMode(ctx) == ThemeMode.GENIE
+
+    /** True when a custom surface palette (Earth or Genie) is active. */
+    fun hasCustomPalette(ctx: Context): Boolean =
+        getThemeMode(ctx) == ThemeMode.EARTH || getThemeMode(ctx) == ThemeMode.GENIE
+
+    /** The active custom palette, or null for the stock Light theme. */
+    fun customPalette(ctx: Context): Palette? = when (getThemeMode(ctx)) {
+        ThemeMode.EARTH -> earthPalette
+        ThemeMode.GENIE -> geniePalette
+        else -> null
+    }
+
+    /** True when the current theme should render in dark. */
+    fun isDark(ctx: Context): Boolean {
+        val mode = getThemeMode(ctx)
+        return when (mode) {
+            ThemeMode.DARK_OLED, ThemeMode.GENIE -> true
+            ThemeMode.SYSTEM -> {
+                val night = ctx.resources.configuration.uiMode and
+                    android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                night == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            }
+            ThemeMode.LIGHT, ThemeMode.EARTH -> false
+        }
+    }
+
     /** Resolves a shared color against the Earth palette when that theme is active. */
     fun color(ctx: Context, resourceId: Int): Int {
-        if (!isEarth(ctx)) return ContextCompat.getColor(ctx, resourceId)
+        val pal = customPalette(ctx) ?: return ContextCompat.getColor(ctx, resourceId)
         return when (resourceId) {
-            R.color.bg -> earthPalette.background
-            R.color.surface -> earthPalette.surface
-            R.color.card_bg -> earthPalette.card
-            R.color.input_bg -> earthPalette.input
-            R.color.text_primary -> earthPalette.textPrimary
-            R.color.text_secondary -> earthPalette.textSecondary
-            R.color.text_tertiary -> earthPalette.textTertiary
-            R.color.border, R.color.stroke -> earthPalette.border
-            R.color.chip_bg -> earthPalette.chip
-            R.color.neutral -> earthPalette.neutral
-            R.color.status_idle -> earthPalette.statusIdle
-            R.color.green_soft -> earthPalette.greenSoft
+            R.color.bg -> pal.background
+            R.color.surface -> pal.surface
+            R.color.card_bg -> pal.card
+            R.color.input_bg -> pal.input
+            R.color.text_primary -> pal.textPrimary
+            R.color.text_secondary -> pal.textSecondary
+            R.color.text_tertiary -> pal.textTertiary
+            R.color.border, R.color.stroke -> pal.border
+            R.color.chip_bg -> pal.chip
+            R.color.neutral -> pal.neutral
+            R.color.status_idle -> pal.statusIdle
+            R.color.green_soft -> pal.greenSoft
             else -> ContextCompat.getColor(ctx, resourceId)
         }
     }
@@ -153,15 +207,7 @@ object ThemeManager {
         val g = Color.green(accent)
         val b = Color.blue(accent)
         // Lighten: blend 85% white in light mode, or darken for dark
-        val isDark = when (getThemeMode(ctx)) {
-            ThemeMode.DARK_OLED -> true
-            ThemeMode.SYSTEM -> {
-                val nightMode = ctx.resources.configuration.uiMode and
-                        android.content.res.Configuration.UI_MODE_NIGHT_MASK
-                nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
-            }
-            ThemeMode.LIGHT, ThemeMode.EARTH -> false
-        }
+        val isDark = isDark(ctx)
         return if (isDark) {
             // Dark mode soft: very dark with accent hue
             Color.rgb(
@@ -182,31 +228,40 @@ object ThemeManager {
 
     /** Applies the Earth surface palette to an already-inflated view hierarchy. */
     fun applyEarthPalette(root: View) {
-        if (!isEarth(root.context)) return
-        root.setBackgroundColor(earthPalette.background)
+        val pal = customPalette(root.context) ?: return
+        if (isGenie(root.context)) {
+            // Deep royal-blue gradient backdrop for the Genie look.
+            root.background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(pal.backgroundTop, pal.background)
+            )
+        } else {
+            root.setBackgroundColor(pal.background)
+        }
         applyEarthPaletteRecursive(root)
     }
 
     private fun applyEarthPaletteRecursive(view: View) {
         val context = view.context
         val accent = getAccentColor(context)
+        val pal = customPalette(context) ?: return
         when (view) {
             is MaterialCardView -> {
                 // Frosted: translucent warm card over the ambient backdrop.
-                view.setCardBackgroundColor(withAlpha(earthPalette.card, 200))
-                view.strokeColor = withAlpha(earthPalette.border, 110)
+                view.setCardBackgroundColor(withAlpha(pal.card, 200))
+                view.strokeColor = withAlpha(pal.border, 110)
             }
             is MaterialButton -> applyEarthButton(view, accent)
             is EditText -> {
                 view.background = earthFieldDrawable(context, accent)
-                view.setTextColor(earthPalette.textPrimary)
-                view.setHintTextColor(earthPalette.textTertiary)
+                view.setTextColor(pal.textPrimary)
+                view.setHintTextColor(pal.textTertiary)
             }
             is CompoundButton -> {
-                view.setTextColor(earthPalette.textSecondary)
+                view.setTextColor(pal.textSecondary)
                 view.buttonTintList = ColorStateList.valueOf(accent)
             }
-            is ImageButton -> view.imageTintList = ColorStateList.valueOf(earthPalette.textTertiary)
+            is ImageButton -> view.imageTintList = ColorStateList.valueOf(pal.textTertiary)
             is FrameLayout -> {
                 // Only the trackpad pad takes the field treatment. Scroll containers
                 // (HorizontalScrollView chip rows, NestedScrollView sheets) are also
@@ -220,19 +275,21 @@ object ThemeManager {
         }
 
         if (view.id == R.id.accentLine) {
-            view.background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(
-                    Color.rgb(180, 112, 76),
-                    Color.rgb(112, 133, 86),
-                    Color.rgb(196, 154, 80)
-                )
+            val stops = if (isGenie(context)) intArrayOf(
+                Color.rgb(62, 123, 255),   // royal blue
+                Color.rgb(111, 160, 255),  // sky
+                Color.rgb(217, 179, 106)   // gold
+            ) else intArrayOf(
+                Color.rgb(180, 112, 76),
+                Color.rgb(112, 133, 86),
+                Color.rgb(196, 154, 80)
             )
+            view.background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, stops)
         } else if (view.id == R.id.tipCallout) {
             view.background = roundedDrawable(
                 context,
-                withAlpha(earthPalette.greenSoft, 170),
-                earthPalette.greenSoft,
+                withAlpha(pal.greenSoft, 170),
+                pal.greenSoft,
                 0
             )
         }
@@ -249,6 +306,7 @@ object ThemeManager {
         Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 
     private fun applyEarthButton(button: MaterialButton, accent: Int) {
+        val pal = customPalette(button.context) ?: return
         val isAccentAction = button.currentTextColor == accent ||
             button.contentDescription == "Add computer"
         val isPrimaryAction = button.id == R.id.btnSend ||
@@ -265,47 +323,51 @@ object ThemeManager {
             button.setTextColor(accent)
             button.iconTint = ColorStateList.valueOf(accent)
         } else {
-            button.backgroundTintList = ColorStateList.valueOf(earthPalette.chip)
-            button.setTextColor(earthPalette.textPrimary)
+            button.backgroundTintList = ColorStateList.valueOf(pal.chip)
+            button.setTextColor(pal.textPrimary)
             button.iconTint = ColorStateList.valueOf(
-                if (iconWasAccent) accent else earthPalette.textPrimary
+                if (iconWasAccent) accent else pal.textPrimary
             )
         }
     }
 
     private fun applyEarthTextColor(textView: TextView) {
+        val pal = customPalette(textView.context) ?: return
         when (textView.currentTextColor) {
             ContextCompat.getColor(textView.context, R.color.text_primary) ->
-                textView.setTextColor(earthPalette.textPrimary)
+                textView.setTextColor(pal.textPrimary)
             ContextCompat.getColor(textView.context, R.color.text_secondary) ->
-                textView.setTextColor(earthPalette.textSecondary)
+                textView.setTextColor(pal.textSecondary)
             ContextCompat.getColor(textView.context, R.color.text_tertiary) ->
-                textView.setTextColor(earthPalette.textTertiary)
+                textView.setTextColor(pal.textTertiary)
         }
     }
 
     private fun earthFieldDrawable(context: Context, accent: Int): StateListDrawable {
+        val pal = customPalette(context) ?: earthPalette
         val background = StateListDrawable()
         background.addState(
             intArrayOf(android.R.attr.state_focused),
-            roundedDrawable(context, earthPalette.input, accent, 2)
+            roundedDrawable(context, pal.input, accent, 2)
         )
         background.addState(
             intArrayOf(),
-            roundedDrawable(context, earthPalette.input, earthPalette.border, 1)
+            roundedDrawable(context, pal.input, pal.border, 1)
         )
         return background
     }
 
     /** Trackpad pad in Earth colors — matches bg_pad_round (20dp radius). */
-    private fun earthPadDrawable(context: Context): GradientDrawable =
-        roundedDrawable(
+    private fun earthPadDrawable(context: Context): GradientDrawable {
+        val pal = customPalette(context) ?: earthPalette
+        return roundedDrawable(
             context,
-            withAlpha(earthPalette.input, 200),
-            withAlpha(earthPalette.border, 110),
+            withAlpha(pal.input, 200),
+            withAlpha(pal.border, 110),
             1,
             radiusDp = 20
         )
+    }
 
     private fun roundedDrawable(
         context: Context,
@@ -351,15 +413,7 @@ object ThemeManager {
         val accent = getAccentColor(context)
         val blue = ContextCompat.getColor(context, R.color.grad_blue)
         val amber = ContextCompat.getColor(context, R.color.grad_amber)
-        val isDark = when (getThemeMode(context)) {
-            ThemeMode.DARK_OLED -> true
-            ThemeMode.SYSTEM -> {
-                val night = context.resources.configuration.uiMode and
-                    android.content.res.Configuration.UI_MODE_NIGHT_MASK
-                night == android.content.res.Configuration.UI_MODE_NIGHT_YES
-            }
-            ThemeMode.LIGHT, ThemeMode.EARTH -> false
-        }
+        val isDark = isDark(context)
 
         val blobs = mutableListOf<View>()
         blobs += createAmbientBlob(context, accent, if (isDark) 120 else 85, 340).also { blob ->
