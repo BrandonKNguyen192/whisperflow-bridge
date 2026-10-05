@@ -41,7 +41,7 @@ The receiver console's pairing link looks like:
 |---|---|
 | `WhisperBridgeCore/` | Shared framework: `BridgeClient` (HTTP), `Pairing` (QR/deep link parser), `ProfileStore` (Keychain tokens), `ThemeStore` |
 | `WhisperBridge/` | SwiftUI app: split view, compose, trackpad, settings, QR scan |
-| `WhisperBridgeTests/` | Unit tests for pairing parsing and HTTP behavior (URLProtocol stub) |
+| `WhisperBridgeTests/` | Unit tests for pairing parsing and raw-TCP HTTP behavior (12 tests) |
 
 The `.xcodeproj` and `Info.plist` are generated from `project.yml` and are
 gitignored — edit `project.yml`, then rerun `xcodegen generate`.
@@ -57,5 +57,4 @@ gitignored — edit `project.yml`, then rerun `xcodegen generate`.
 - [x] Themes: Light / Earth / Dark OLED / System + accent picker
 - [ ] Share extension (voice input from any app / Wispr Flow)
 - [ ] In-app dictation (`SFSpeechRecognizer`)
-- [ ] Air mouse (`CoreMotion`)
 - [ ] TestFlight / App Store signing

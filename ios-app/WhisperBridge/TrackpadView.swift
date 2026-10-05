@@ -123,7 +123,7 @@ struct TrackpadView: View {
                 )
                 .frame(height: 220)
                 .contentShape(Rectangle())
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .liquidRecessed(cornerRadius: 16)
                 .gesture(padGesture)
                 .animation(.easeOut(duration: 0.25), value: touchPoint == nil)
 

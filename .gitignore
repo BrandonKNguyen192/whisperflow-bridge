@@ -18,10 +18,15 @@ Thumbs.db
 .vscode/
 *.iml
 
-# APK — only track builds/ directory
+# APK build artifacts are produced locally and published from GitHub Releases
 *.apk
-!builds/*.apk
-!builds/*.sha256
+*.sha256
+
+# Local secret copies
+/token.txt
+
+# Local virtualenv
+/.venv/
 
 # Logs
 /tmp/

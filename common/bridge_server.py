@@ -17,14 +17,14 @@ import subprocess
 import threading
 import sys
 import time
-from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import hmac
 import secrets
 import stat
 
 DEFAULT_PORT = 9877
-VERSION = "1.1.0"
+VERSION = "1.3.0"
 TARGET_NAME = "Mac"
 PASTE_SHORTCUT = "⌘V"
 AUTH_TOKEN = None  # set in main(); when set, /send + console require it
@@ -72,8 +72,16 @@ def resolve_token(cli_token: str | None) -> str:
     persist_token(token)
     return token
 
-def get_lan_ip():
+LAN_CACHE_TTL = 30.0
+TAIL_CACHE_TTL = 30.0
+
+_lan_cache = {"ip": None, "ts": 0.0}
+def get_lan_ip(force=False):
     """Best-effort LAN/egress IPv4 via a UDP connect (no packets sent)."""
+    now = time.monotonic()
+    if not force and (now - _lan_cache["ts"]) < LAN_CACHE_TTL:
+        return _lan_cache["ip"]
+    ip = "127.0.0.1"
     if sys.platform == "darwin":
         for interface in ("en0", "en1"):
             try:
@@ -82,31 +90,39 @@ def get_lan_ip():
                     capture_output=True, text=True, timeout=1,
                 ).stdout.strip()
                 if out:
-                    return out
+                    ip = out
+                    break
             except Exception:
                 pass
-    for target in ("8.8.8.8", "1.1.1.1"):
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.settimeout(0.3)
-            s.connect((target, 80))
-            ip = s.getsockname()[0]
-            s.close()
-            if ip and ip != "127.0.0.1":
-                return ip
-        except Exception:
-            pass
-    return "127.0.0.1"
+    if ip == "127.0.0.1":
+        for target in ("8.8.8.8", "1.1.1.1"):
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.settimeout(0.3)
+                s.connect((target, 80))
+                candidate = s.getsockname()[0]
+                s.close()
+                if candidate and candidate != "127.0.0.1":
+                    ip = candidate
+                    break
+            except Exception:
+                pass
+    _lan_cache["ip"] = ip
+    _lan_cache["ts"] = now
+    return ip
 
 _tail_cache = {"ip": None, "ts": 0.0}
 def get_tail_ip(force=False):
-    """Cached Tailscale IPv4 (None if Tailscale is absent/offline). Cached 15s."""
-    now = time.time()
-    if not force and (now - _tail_cache["ts"]) < 15:
+    """Cached Tailscale IPv4 (None if Tailscale is absent/offline)."""
+    now = time.monotonic()
+    if not force and (now - _tail_cache["ts"]) < TAIL_CACHE_TTL:
         return _tail_cache["ip"]
     ip = None
     try:
-        out = subprocess.run(["tailscale", "ip", "-4"],
+        tailscale_bin = "/opt/homebrew/bin/tailscale"
+        if not os.path.exists(tailscale_bin):
+            tailscale_bin = "tailscale"
+        out = subprocess.run([tailscale_bin, "ip", "-4"],
                              capture_output=True, text=True, timeout=1.5).stdout.strip()
         if out:
             ip = out.splitlines()[0].strip() or None
@@ -140,8 +156,8 @@ def start_allowed_hosts_refresher() -> threading.Thread:
     """Keep dynamic LAN and Tailscale addresses valid after network changes."""
     def refresh():
         while True:
-            time.sleep(15)
-            for host in (get_tail_ip(force=True), get_lan_ip()):
+            time.sleep(60)
+            for host in (get_tail_ip(force=True), get_lan_ip(force=True)):
                 if host:
                     ALLOWED_HOSTS.add(host.lower())
 

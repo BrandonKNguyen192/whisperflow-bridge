@@ -183,7 +183,7 @@ struct ComposeView: View {
                 .textFieldStyle(.plain)
                 .font(.body)
                 .padding(16)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .liquidRecessed(cornerRadius: 16)
 
             HStack(spacing: 12) {
                 sendButton

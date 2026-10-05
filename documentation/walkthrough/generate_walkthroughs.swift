@@ -315,7 +315,7 @@ func drawIOSPage(_ ctx: CGContext, _ page: Int, mainLight: String, settings: Str
         ctx.move(to: CGPoint(x: xs[1] + 22, y: 454)); ctx.addLine(to: CGPoint(x: xs[2] - 22, y: 454)); ctx.strokePath()
         fill(ctx, CGRect(x: margin + 24, y: 570, width: 508, height: 28), greenSoft, radius: 14)
         drawText(ctx: ctx, "iOS 26+  |  Liquid Glass  |  Tailscale-ready  |  iPhone + iPad", x: margin + 34, y: 578, width: 488, size: 9, color: green, weight: .bold, alignment: .center)
-        drawText(ctx: ctx, "iOS is currently a signed preview build. The desktop receiver protocol is shared with Android.", x: margin, y: 650, width: 510, size: 9, color: quiet)
+        drawText(ctx: ctx, "The iOS client source lives in ios-app/. The desktop receiver protocol is shared with Android.", x: margin, y: 650, width: 510, size: 9, color: quiet)
         drawText(ctx: ctx, "whisperbridge.app  |  Open source setup guide", x: margin, y: 690, width: 400, size: 9, color: muted, weight: .bold)
         return
     }
@@ -323,7 +323,7 @@ func drawIOSPage(_ ctx: CGContext, _ page: Int, mainLight: String, settings: Str
     if page == 2 {
         drawText(ctx: ctx, "Install the three pieces.", x: margin, y: 100, width: 500, size: 27, weight: .bold)
         drawText(ctx: ctx, "The iOS app is the controller. Your computer runs the receiver; Tailscale makes the path private.", x: margin, y: 143, width: 500, size: 12, color: muted)
-        miniStep(ctx, "1", "Whisper Bridge iOS", "Install the signed preview on iPhone or iPad.", x: margin, y: 205, width: 242)
+        miniStep(ctx, "1", "Whisper Bridge iOS", "Build the iOS app from ios-app/ source with Xcode.", x: margin, y: 205, width: 242)
         miniStep(ctx, "2", "Tailscale", "Sign in to the same tailnet on phone and computer.", x: 318, y: 205, width: 242)
         cardBox(ctx, CGRect(x: margin, y: 320, width: 508, height: 112))
         number(ctx, "3", x: margin + 20, y: 360)
@@ -405,7 +405,6 @@ let androidPDF = output.appendingPathComponent("whisper-bridge-android-walkthrou
 writePDF(path: androidPDF, pageCount: 6) { ctx, page in drawAndroidPage(ctx, page) }
 
 let iOSMainLight = root.appendingPathComponent("documentation/screenshots/ios-walkthrough-main-light.png").path
-let iOSMainDark = root.appendingPathComponent("documentation/screenshots/ios-walkthrough-main-dark.png").path
 let iOSSettings = root.appendingPathComponent("documentation/screenshots/ios-walkthrough-settings-earth.png").path
 let iosPDF = output.appendingPathComponent("whisper-bridge-iphone-walkthrough.pdf").path
 writePDF(path: iosPDF, pageCount: 5) { ctx, page in

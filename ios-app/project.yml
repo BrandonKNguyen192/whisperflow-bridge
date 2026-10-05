@@ -51,7 +51,6 @@ targets:
         NSCameraUsageDescription: Used to scan the pairing QR code shown by your computer's receiver console.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-          NSAllowsArbitraryLoads: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.whisperbridge.ios

@@ -3,15 +3,23 @@
 Whisper Bridge for iOS turns your iPhone or iPad into a remote compose pad,
 trackpad, and air mouse for a Mac, Ubuntu, or Windows receiver.
 
-The iOS client is currently a signed preview build targeting iOS 26 and later.
-It uses the same receiver protocol as Android.
+The iOS client is built from source in `ios-app/` and targets iOS 26 and later.
+It uses the same receiver protocol as Android. The repository does not ship a
+signed IPA.
 
 ## What You Need
 
 - An iPhone or iPad running iOS/iPadOS 26 or later.
-- A signed Whisper Bridge iOS preview build.
+- Xcode 26 or later and XcodeGen (`brew install xcodegen`).
 - A Mac, Ubuntu, or Windows computer running the Whisper Bridge receiver.
 - Tailscale installed and signed in on both devices for remote use.
+
+## Build The App
+
+1. Install Xcode 26 or later and XcodeGen.
+2. Run `cd ios-app && xcodegen generate`.
+3. Open `ios-app/WhisperBridge.xcodeproj`, select your signing team, and Run on
+   an iPhone/iPad or the iOS simulator.
 
 ## 1. Install The Receiver
 

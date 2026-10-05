@@ -6,9 +6,10 @@ Runs the bridge server in the background and shows a status item in the menu
 bar with live LAN / Tailscale addresses, the last dictation, and quick actions
 (open console, copy pairing link). Optionally installs itself as a login item.
 
-The server engine (server.py) stays dependency-free; this wrapper needs `rumps`
-for the menu bar (pip3 install rumps). If rumps is missing it falls back to
-running the server headless so a login launch still works — just without the icon.
+The server engine (common/bridge_server.py) stays dependency-free; this wrapper
+needs `rumps` for the menu bar (pip3 install rumps). If rumps is missing it
+falls back to running the server headless so a login launch still works — just
+without the icon.
 
 Usage:
     python3 menubar.py                       # menu bar + server (needs rumps)
@@ -28,7 +29,7 @@ import urllib.parse
 import webbrowser
 from xml.sax.saxutils import escape as xml_escape
 
-# Import the zero-dependency shared receiver protocol.
+# Import the shared receiver protocol.
 MAC_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(MAC_DIR)
 sys.path.insert(0, ROOT_DIR)
@@ -204,7 +205,7 @@ def run_gui(port: int, httpd) -> None:
         def on_quit(self, _):
             rumps.quit_application()
 
-        @rumps.timer(3)
+        @rumps.timer(10)
         def refresh(self, _):
             try:
                 lan = server.get_lan_ip()

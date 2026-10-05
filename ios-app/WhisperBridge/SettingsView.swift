@@ -86,7 +86,7 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .font(.body)
                     .padding(14)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .liquidRecessed(cornerRadius: 14)
             }
 
             HStack(spacing: 10) {
@@ -159,7 +159,7 @@ struct SettingsView: View {
                 .autocorrectionDisabled()
                 .font(.body)
                 .padding(14)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .liquidRecessed(cornerRadius: 14)
         }
     }
 

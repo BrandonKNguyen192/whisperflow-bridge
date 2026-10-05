@@ -122,10 +122,32 @@ enum Motion {
 
 extension View {
     /// Layered translucent material with Liquid Glass treatment on top.
-    func glassCard(cornerRadius: CGFloat = 24) -> some View {
+    func glassCard(cornerRadius: CGFloat = 32) -> some View {
         self
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [.white.opacity(0.4), .clear, .white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .blendMode(.overlay)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.6), .clear, .white.opacity(0.2)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+                    .blendMode(.overlay)
+            )
+            .shadow(color: Color.black.opacity(0.12), radius: 24, y: 12)
     }
 
     /// Interactive glass pill — buttons, chips, toggles.
@@ -134,6 +156,23 @@ extension View {
             (tint.map { Glass.regular.tint($0) } ?? .regular).interactive(),
             in: shape
         )
+    }
+
+    /// Deeply carved liquid cutout for trackpads and inputs.
+    func liquidRecessed(cornerRadius: CGFloat = 16) -> some View {
+        self
+            .background(Color.black.opacity(0.05), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.15), .clear, Color.white.opacity(0.3)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
     }
 }
 
@@ -150,13 +189,13 @@ struct AmbientBackground: View {
     var body: some View {
         ZStack {
             palette.background.ignoresSafeArea()
-            blob(accent.opacity(0.35), size: 340,
+            blob(accent.opacity(0.55), size: 340,
                  offset: drift ? CGSize(width: 40, height: 30) : CGSize(width: -30, height: -40),
                  anchor: .topLeading)
-            blob(Color(hex: "#4C8DFF").opacity(0.28), size: 300,
+            blob(Color(hex: "#4C8DFF").opacity(0.45), size: 300,
                  offset: drift ? CGSize(width: -50, height: 20) : CGSize(width: 40, height: -20),
                  anchor: .bottomTrailing)
-            blob(Color(hex: "#F2C14E").opacity(0.22), size: 260,
+            blob(Color(hex: "#F2C14E").opacity(0.35), size: 260,
                  offset: drift ? CGSize(width: 20, height: -30) : CGSize(width: -40, height: 40),
                  anchor: .bottomLeading)
         }
@@ -172,6 +211,7 @@ struct AmbientBackground: View {
             .fill(color)
             .frame(width: size, height: size)
             .blur(radius: 90)
+            .blendMode(.plusLighter)
             .offset(offset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: anchor)
     }

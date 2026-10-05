@@ -145,5 +145,44 @@ class AllowedHostTests(unittest.TestCase):
         self.assertIn("studio.example.ts.net", server.ALLOWED_HOSTS)
 
 
+class IpCacheTests(unittest.TestCase):
+    def setUp(self):
+        self._lan_cache = dict(server._lan_cache)
+        self._tail_cache = dict(server._tail_cache)
+
+    def tearDown(self):
+        server._lan_cache = dict(self._lan_cache)
+        server._tail_cache = dict(self._tail_cache)
+
+    @mock.patch.object(server.subprocess, "run")
+    def test_lan_ip_is_cached_across_calls(self, run):
+        run.return_value = mock.Mock(stdout="192.168.1.5\n")
+        server._lan_cache.update(ip=None, ts=0.0)
+        with mock.patch.object(server.sys, "platform", "darwin"):
+            self.assertEqual(server.get_lan_ip(), "192.168.1.5")
+            self.assertEqual(server.get_lan_ip(), "192.168.1.5")
+        run.assert_called_once()
+
+    @mock.patch.object(server.subprocess, "run")
+    def test_lan_ip_force_refreshes_cache(self, run):
+        run.side_effect = [
+            mock.Mock(stdout="192.168.1.5\n"),
+            mock.Mock(stdout="192.168.1.9\n"),
+        ]
+        server._lan_cache.update(ip=None, ts=0.0)
+        with mock.patch.object(server.sys, "platform", "darwin"):
+            self.assertEqual(server.get_lan_ip(), "192.168.1.5")
+            self.assertEqual(server.get_lan_ip(force=True), "192.168.1.9")
+        self.assertEqual(run.call_count, 2)
+
+    @mock.patch.object(server.subprocess, "run")
+    def test_tail_ip_is_cached_across_calls(self, run):
+        run.return_value = mock.Mock(stdout="100.64.1.2\n")
+        server._tail_cache.update(ip=None, ts=0.0)
+        self.assertEqual(server.get_tail_ip(), "100.64.1.2")
+        self.assertEqual(server.get_tail_ip(), "100.64.1.2")
+        run.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

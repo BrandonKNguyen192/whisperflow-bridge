@@ -19,11 +19,15 @@ import urllib.request
 # ── Config ──────────────────────────────────────────────────────────────────
 
 SERVER_PORT = int(os.environ.get("WHISPERFLOW_PORT", "9877"))
-POLL_INTERVAL = 1.0
+POLL_INTERVAL = 3.0
+FLASH_SECONDS = 4.0
+FLASH_TICK_MS = 50
+IDLE_TICK_MS = 500
 OVERLAY_WIDTH = 248
 OVERLAY_HEIGHT = 44
 MARGIN = 20
 TOKEN_FILE = os.path.expanduser("~/.config/whisperbridge/token")
+_token_cache = {"token": None, "mtime": None}
 
 # ── Komodos palette ─────────────────────────────────────────────────────────
 
@@ -57,11 +61,28 @@ def get_screen_size():
     return 1800, 1169  # fallback
 
 
-def poll_server():
-    """Returns dict with server status, or None if unreachable."""
+def read_token():
+    """Read the bridge token, re-reading only when the file changes."""
+    try:
+        mtime = os.stat(TOKEN_FILE).st_mtime
+    except OSError:
+        return ""
+    if _token_cache["token"] is not None and _token_cache["mtime"] == mtime:
+        return _token_cache["token"]
     try:
         with open(TOKEN_FILE, encoding="utf-8") as fh:
             token = fh.read().strip()
+    except OSError:
+        return ""
+    _token_cache["token"] = token
+    _token_cache["mtime"] = mtime
+    return token
+
+
+def poll_server():
+    """Returns dict with server status, or None if unreachable."""
+    try:
+        token = read_token()
         req = urllib.request.Request(
             f"http://localhost:{SERVER_PORT}/status",
             headers={
@@ -109,6 +130,7 @@ class FloatingPill:
         self._running = True
         self._pulse = 0.0
         self._anim_frame = 0
+        self._ui_dirty = True
 
     def _draw(self):
         self.canvas.delete("all")
@@ -238,27 +260,34 @@ class FloatingPill:
         if not self._running:
             return
 
-        self._anim_frame += 1
-        self._pulse = (self._anim_frame % 120) / 60.0 - 1.0  # -1 to 1 sine wave
-
-        # Fade in
+        active = False
         alpha = self.win.attributes("-alpha")
         if alpha < 0.92:
             self.win.attributes("-alpha", min(0.92, alpha + 0.05))
             if alpha < 0.01:
                 self.win.deiconify()
+            active = True
 
-        self._draw()
-        self.root.after(50, self.animate)
+        if time.time() < self.flash_until:
+            self._anim_frame += 1
+            self._pulse = (self._anim_frame % 120) / 60.0 - 1.0
+            active = True
+
+        if self._ui_dirty or active:
+            self._ui_dirty = False
+            self._draw()
+        delay = FLASH_TICK_MS if active else IDLE_TICK_MS
+        self.root.after(delay, self.animate)
 
     def flash_dictation(self, preview, mode, count):
         self.last_preview = preview
         self.last_mode = mode
         self.dictation_count = count
-        self.flash_until = time.time() + 4.0
+        self.flash_until = time.time() + FLASH_SECONDS
+        self._ui_dirty = True
 
     def start(self):
-        self.root.after(50, self.animate)
+        self.root.after(FLASH_TICK_MS, self.animate)
         self._start_poll()
 
     def _start_poll(self):
@@ -267,21 +296,27 @@ class FloatingPill:
             while self._running:
                 data = poll_server()
                 if data and data.get("ok"):
-                    if not self.server_ok:
-                        self.server_ok = True
                     status = data.get("status", {})
                     new_count = status.get("count", 0)
                     new_preview = status.get("last_preview", "")
                     new_mode = status.get("last_mode", "")
+                    if not self.server_ok:
+                        self.server_ok = True
+                        self._ui_dirty = True
                     if new_count > last_count:
                         last_count = new_count
                         self.flash_dictation(new_preview, new_mode, new_count)
                     if time.time() > self.flash_until and self.last_preview:
                         self.last_preview = ""
                         self.last_mode = ""
-                    self.dictation_count = last_count
+                        self._ui_dirty = True
+                    if last_count != self.dictation_count:
+                        self.dictation_count = last_count
+                        self._ui_dirty = True
                 else:
-                    self.server_ok = False
+                    if self.server_ok:
+                        self.server_ok = False
+                        self._ui_dirty = True
                 time.sleep(POLL_INTERVAL)
 
         t = threading.Thread(target=poll, daemon=True)

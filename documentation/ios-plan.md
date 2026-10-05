@@ -69,13 +69,11 @@ Android's Wispr Flow share flow maps 1:1 to path 2, so users get the identical
 - QR pairing via `AVCaptureMetadataOutput` parsing the existing
   `whisperbridge://pair` payload; manual host entry with a Test button is the
   fallback (same UX as Android).
-- Store tokens in **Keychain** (shared access group so the share extension can
-  read them); store non-secret profile metadata in App Group `UserDefaults`.
-- Network permission: add `NSLocalNetworkUsageDescription`, and allow plain
-  HTTP to LAN/Tailscale hosts in ATS (the server is intentionally HTTP;
-  Tailscale carries the encryption, as in the Android design). The bridge
-  client separately rejects public internet hosts, so the ATS exception is
-  scoped to receiver addresses in practice.
+- Store tokens in **Keychain**; store non-secret profile metadata in
+  `UserDefaults`.
+- Network permission: add `NSLocalNetworkUsageDescription`. The raw-TCP
+  transport is not policed by ATS, and the bridge client separately rejects
+  public internet hosts; Tailscale carries encryption over plain HTTP.
 
 ### 4. Trackpad and Air Mouse
 
@@ -105,26 +103,24 @@ Android's Wispr Flow share flow maps 1:1 to path 2, so users get the identical
 ```
 ios-app/
   project.yml                    # XcodeGen spec (reproducible project file)
-  WhisperBridge.xcodeproj        # generated
-  WhisperBridgeCore/             # shared framework: client, pairing, profiles, throttle
-    BridgeClient.swift           # URLSession port of BridgeClient.kt
+  WhisperBridge.xcodeproj        # generated, gitignored
+  WhisperBridgeCore/             # shared framework: client, pairing, profiles, theme
+    BridgeClient.swift           # raw-TCP HTTP port of BridgeClient.kt
     Pairing.swift                # whisperbridge:// parser (port of Pairing.kt)
-    ProfileStore.swift           # Keychain tokens + App Group metadata
-    ControlStream.swift          # trackpad/air-mouse delta throttler
-  WhisperBridge/                 # main app target (SwiftUI)
-  ShareExtension/                # share sheet target
-  WhisperBridgeTests/            # XCTest: Pairing, BridgeClient (URLProtocol mock), throttling
-  Assets.xcassets                # icon, dark/light colors, accent palette
+    ProfileStore.swift           # Keychain-backed profile tokens
+    ThemeStore.swift             # theme mode and accent persistence
+  WhisperBridge/                 # main SwiftUI app target
+  WhisperBridgeTests/            # XCTest: Pairing, raw-TCP BridgeClient
 ```
 
-Build with XcodeGen so the project is reproducible from the command line, and
-add a `ios-app/README.md` with build/signing steps.
+Build with XcodeGen so the project is reproducible from the command line;
+build and signing steps live in `ios-app/README.md`.
 
 ## Phases
 
 1. **Core app** — ✅ shipped. Compose view (Type/Enter/Clipboard/Append,
    enter-after-type), manual profile entry + Test, QR pairing, themes + accent
-   picker, Keychain + App Group storage, Liquid Glass surfaces and ambient
+   picker, Keychain-backed tokens + UserDefaults metadata, Liquid Glass surfaces and ambient
    backdrop, spring motion tokens, haptics.
 2. **Voice** — share extension with confirm preview; in-app `SFSpeechRecognizer`
    dictation button; status feedback for all three paths.
@@ -162,9 +158,9 @@ endpoints and a local `curl` smoke test before any UI work.
 - Wispr Flow does not currently ship an iOS client we can verify against; the
   share-extension path is designed to absorb it the moment it exists, and the
   built-in dictation covers the same job today.
-- Plain HTTP to LAN IPs requires the ATS local-networking exception and the
-  iOS Local Network permission prompt; the flow must explain why the prompt
-  appears.
+- The client speaks raw TCP HTTP to avoid ATS restrictions; iOS still shows
+  the Local Network permission prompt on first connection, and the flow must
+  explain why it appears.
 - Liquid Glass requires iOS 26+. If a broad older-device audience matters
   later, we can lower the floor with custom translucent materials, but the plan
   keeps the floor at iOS 26 to honor the design goal.
@@ -179,10 +175,10 @@ endpoints and a local `curl` smoke test before any UI work.
 3. Stand up the local receiver, pair from the simulator, and send text.
 4. Then start Phase 2 voice, then mouse, then iPad layout.
 
-## Current Build (Phase 1 Complete)
+## Current Build
 
-- `ios-app/` builds with XcodeGen on Xcode 27 and runs on the iOS 27 iPad
-  simulator. `xcodebuild` and `xcodebuild test` both pass (10 unit tests).
+- `ios-app/` builds with XcodeGen on Xcode 26+ and runs on the iOS 27 iPad
+  simulator. `xcodebuild` and `xcodebuild test` both pass (12 unit tests).
 - Core framework `WhisperBridgeCore` ports `BridgeClient.kt`, `Pairing.kt`,
   profile storage (tokens in Keychain), and theme persistence with test parity.
 - UI: sidebar profiles + chips, compose (Type / Enter / Clipboard,
@@ -193,4 +189,4 @@ endpoints and a local `curl` smoke test before any UI work.
 - Build and run instructions live in `ios-app/README.md`.
 
 Remaining phases: share extension, in-app `SFSpeechRecognizer` dictation,
-CoreMotion air mouse, and TestFlight / App Store signing.
+accessibility pass, and TestFlight / App Store signing.

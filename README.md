@@ -21,11 +21,11 @@ Then install the desktop receiver using `mac-server/install.command`, `ubuntu-se
 For the complete first-time setup, see [Getting Started](documentation/getting-started.md).
 Prefer a printable guide? Download the [Android setup walkthrough (PDF)](output/pdf/whisper-bridge-android-walkthrough.pdf).
 
-Using the iOS preview? Follow the [iPhone / iPad walkthrough](documentation/ios-getting-started.md) or download the [printable iPhone walkthrough (PDF)](output/pdf/whisper-bridge-iphone-walkthrough.pdf).
+Using the iOS client? Follow the [iPhone / iPad walkthrough](documentation/ios-getting-started.md) or download the [printable iPhone walkthrough (PDF)](output/pdf/whisper-bridge-iphone-walkthrough.pdf).
 
-A signed iOS/iPadOS preview is available in `ios-app/` (see
-[iPhone / iPad walkthrough](documentation/ios-getting-started.md) and
-`documentation/ios-plan.md`).
+The iOS/iPadOS client is built from source in `ios-app/`; the repository does
+not ship a signed IPA. See [iPhone / iPad walkthrough](documentation/ios-getting-started.md)
+and `documentation/ios-plan.md`.
 
 ## Screenshots
 
@@ -147,13 +147,14 @@ Each QR carries a destination name, so Android can switch between Mac, Ubuntu, a
 
 ### Settings (gear icon ⚙️)
 - **Connection** — Host IP, Port, Token, Scan QR, and Test button
-- **Appearance** — Theme (Light / Dark OLED / System), eight curated accents, and a custom RGB color picker
+- **Appearance** — Theme (Light / Earth / Dark OLED / System), eight curated accents, and a custom RGB color picker
 
 ### Profile switcher
 Tap the profile chips at the top to switch between computers. Long-press to delete. Each profile stores its own host, port, and token.
 
 ### Theme
 - **Light** — warm off-white canvas with sage accents
+- **Earth** — warm sand and sage palette with an adaptive glass tint
 - **Dark OLED** — pure black (#000000) background for power savings on OLED screens
 - **System** — follows your phone's dark mode setting
 
@@ -200,19 +201,20 @@ python3 mac-server/menubar.py
 Whisperflow Bridge/               ← this repo
 ├── common/                    # Authenticated HTTP protocol and shared runtime
 ├── mac-server/
-│   ├── server.py              # Compatibility entry point
+│   ├── server.py              # Compatibility shim (delegates to common/)
 │   ├── launch.py              # Convenience launcher: server + overlay + login item
 │   ├── overlay.py             # Floating status pill (tkinter)
 │   └── menubar.py             # Menu-bar app + login item (needs `rumps`)
 ├── ubuntu-server/             # Wayland/X11 backend and systemd installer
 ├── windows-server/            # In-process Win32 SendInput backend and startup installer
+├── ios-app/                   # SwiftUI/XcodeGen client source
 ├── android-app/               # Android Studio project
 │   ├── app/src/main/java/com/whisperbridge/
 │   │   ├── MainActivity.kt           # Multi-profile UI + settings + theme picker
 │   │   ├── ShareReceiverActivity.kt  # Share sheet receiver
 │   │   ├── ScanActivity.kt           # In-app QR scanner (ZXing)
 │   │   ├── ProfileManager.kt         # Multi-profile storage
-│   │   ├── ThemeManager.kt           # Light / Dark OLED / System + accent colors
+│   │   ├── ThemeManager.kt           # Light / Earth / Dark OLED / System + accent colors
 │   │   ├── Pairing.kt                # Parses QR / deep link URLs
 │   │   └── BridgeClient.kt           # HTTP client (type, clipboard, append, enter)
 │   └── res/                          # Layouts, colors, icons, drawables, themes

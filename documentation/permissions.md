@@ -16,6 +16,7 @@
 | `GET /health` | Allow: availability only | Allow | Allow |
 | `GET /status` | Deny `401` | Allow | Allow with token |
 | `POST /send` | Deny `401` | Allow after all request validation | Allow with token |
+| `POST /control` | Deny `401` | Allow after action validation | Allow with token |
 | Web console | Deny `401` | Not normally used | Allow with header or bootstrap query token |
 | Read/replace token | Deny by OS permissions | No desktop filesystem access | Allow |
 | Install startup service | Deny | Deny | Allow in current user scope |
