@@ -51,6 +51,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSLocalNetworkUsageDescription: Whisper Bridge connects to your computer over your local network or Tailscale to type on it.
         NSCameraUsageDescription: Used to scan the pairing QR code shown by your computer's receiver console.
+        NSBluetoothAlwaysUsageDescription: Whisper Bridge uses Bluetooth to send text to your Mac when there is no Wi-Fi, for example on a plane.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
           NSAllowsArbitraryLoads: true

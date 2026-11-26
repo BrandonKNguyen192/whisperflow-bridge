@@ -23,14 +23,14 @@ struct SidebarView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: profile.host.isEmpty ? "desktopcomputer" : "laptopcomputer")
+                            Image(systemName: profile.transport == .bluetooth ? "dot.radiowaves.left.and.right" : (profile.host.isEmpty ? "desktopcomputer" : "laptopcomputer"))
                                 .foregroundStyle(profiles.activeIndex == index ? accent : Color.secondary)
                                 .frame(width: 26)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(profile.name)
                                     .font(.headline)
                                     .foregroundStyle(.primary)
-                                Text(profile.host.isEmpty ? "Not configured" : profile.host)
+                                Text(profile.transport == .bluetooth ? "Bluetooth (text only)" : (profile.host.isEmpty ? "Not configured" : profile.host))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)

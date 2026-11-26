@@ -21,7 +21,8 @@ struct ComposeView: View {
     private var palette: AppPalette { AppPalette.palette(for: theme.mode) }
     private var accent: Color { Color(hex: theme.accentHex) }
     private var active: Profile? { profiles.active }
-    private var configured: Bool { active?.host.isEmpty == false }
+    private var configured: Bool { active?.isConfigured == true }
+    private var bluetooth: Bool { active?.transport == .bluetooth }
 
     var body: some View {
         ZStack {
@@ -31,10 +32,20 @@ struct ComposeView: View {
                     header
                     profileChips
                     composeCard
-                    TrackpadView { text, isError in
-                        withAnimation(Motion.tap) {
-                            message = text
-                            messageIsError = isError
+                    if bluetooth {
+                        // Bluetooth carries text only: no trackpad or air mouse.
+                        Label("Bluetooth mode sends text only. Trackpad and air mouse need Wi-Fi or Tailscale.",
+                              systemImage: "dot.radiowaves.left.and.right")
+                            .font(.footnote)
+                            .foregroundStyle(palette.textSecondary)
+                            .padding(16)
+                            .glassCard()
+                    } else {
+                        TrackpadView { text, isError in
+                            withAnimation(Motion.tap) {
+                                message = text
+                                messageIsError = isError
+                            }
                         }
                     }
                 }
@@ -114,7 +125,9 @@ struct ComposeView: View {
 
     private var statusText: String {
         guard let active, configured else { return "Not connected" }
-        return "\(active.name) · \(active.host)"
+        return active.transport == .bluetooth
+            ? "\(active.name) · Bluetooth (text only)"
+            : "\(active.name) · \(active.host)"
     }
 
     private var profileChips: some View {
@@ -262,7 +275,7 @@ struct ComposeView: View {
     // MARK: - Actions
 
     private func send(mode: String) {
-        guard let active, !active.host.isEmpty else {
+        guard let active, active.isConfigured else {
             withAnimation(Motion.tap) {
                 message = "Configure the connection in Settings"
                 messageIsError = true
@@ -279,14 +292,17 @@ struct ComposeView: View {
         sending = true
         let payload = mode == "enter" ? "" : text
         Task {
-            let result = await BridgeClient.live.sendText(
-                host: active.host,
-                port: active.port,
-                text: payload,
-                mode: mode,
-                token: active.token,
-                enterAfter: enterAfter
-            )
+            let result = active.transport == .bluetooth
+                ? await BluetoothBridge.shared.send(
+                    text: payload, mode: mode, enterAfter: enterAfter, token: active.token)
+                : await BridgeClient.live.sendText(
+                    host: active.host,
+                    port: active.port,
+                    text: payload,
+                    mode: mode,
+                    token: active.token,
+                    enterAfter: enterAfter
+                )
             withAnimation(Motion.tap) {
                 message = result.message
                 messageIsError = !result.ok

@@ -2,25 +2,52 @@ import Combine
 import Foundation
 import Security
 
+/// How a profile reaches its computer.
+public enum Transport: String, Codable, CaseIterable {
+    /// HTTP over Wi-Fi, LAN or Tailscale — text, trackpad and air mouse.
+    case network
+    /// Bluetooth LE to the Mac helper app — text only, works with no network.
+    case bluetooth
+}
+
 public struct Profile: Codable, Identifiable, Equatable {
     public var id: UUID
     public var name: String
     public var host: String
     public var port: Int
     public var token: String
+    public var transport: Transport
 
     public init(
         id: UUID = UUID(),
         name: String,
         host: String = "",
         port: Int = 9877,
-        token: String = ""
+        token: String = "",
+        transport: Transport = .network
     ) {
         self.id = id
         self.name = name
         self.host = host
         self.port = port
         self.token = token
+        self.transport = transport
+    }
+
+    /// Bluetooth needs no host; network profiles do.
+    public var isConfigured: Bool { transport == .bluetooth || !host.isEmpty }
+
+    enum CodingKeys: String, CodingKey { case id, name, host, port, token, transport }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        host = try c.decodeIfPresent(String.self, forKey: .host) ?? ""
+        port = try c.decodeIfPresent(Int.self, forKey: .port) ?? 9877
+        token = try c.decodeIfPresent(String.self, forKey: .token) ?? ""
+        // Profiles saved before Bluetooth existed decode as network profiles.
+        transport = try c.decodeIfPresent(Transport.self, forKey: .transport) ?? .network
     }
 }
 
@@ -53,7 +80,7 @@ public final class ProfileStore: ObservableObject {
         defaults.set(index, forKey: Keys.active)
     }
 
-    public func saveConnection(index: Int, host: String, port: Int, token: String) {
+    public func saveConnection(index: Int, host: String, port: Int, token: String, transport: Transport? = nil) {
         guard profiles.indices.contains(index) else { return }
         let existing = profiles[index]
         updateKeychainToken(token, for: existing.id)
@@ -62,7 +89,8 @@ public final class ProfileStore: ObservableObject {
             name: existing.name,
             host: host,
             port: port,
-            token: token
+            token: token,
+            transport: transport ?? existing.transport
         )
         persist()
     }

@@ -177,6 +177,22 @@ curl -H "Authorization: Bearer $(cat ~/.config/whisperbridge/token)" -H 'Content
   http://<tailnet-ip>:9877/send
 ```
 
+## Bluetooth Mode (iPhone, text only — no Wi‑Fi needed)
+
+For planes and other places with no shared network. The iPhone sends text to
+the Mac over Bluetooth LE. **Text only:** type, clipboard, append and Enter.
+The trackpad and air mouse are hidden for Bluetooth profiles and refused by the
+Mac helper.
+
+1. On the Mac, the normal receiver must be running (it does the typing).
+2. Build and open the helper: `mac-bluetooth/build.sh`, then open
+   `mac-bluetooth/build/WhisperBridge Bluetooth.app`. Allow Bluetooth when asked.
+3. On the iPhone: Settings → pick (or add) a profile → **Transport: Bluetooth
+   (text only)**. Scan the pairing QR once at home so the token is saved.
+4. Tap **Test**. Accept the Bluetooth pairing prompt on both devices the first time.
+
+See [mac-bluetooth/README.md](mac-bluetooth/README.md) for details and limits.
+
 ## Menu Bar App (start/stop with one click)
 
 `menubar.py` runs the bridge with a 🎙 status item: one click **Stop bridge** /

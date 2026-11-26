@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var host = ""
     @State private var portText = "9877"
     @State private var token = ""
+    @State private var transport: Transport = .network
+    @ObservedObject private var bluetoothLink = BluetoothBridge.shared
     @State private var selectedMode: ThemeMode = .system
     @State private var selectedAccent = ThemeStore.defaultAccent
     @State private var message = ""
@@ -74,8 +76,24 @@ struct SettingsView: View {
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             sectionLabel("CONNECTION")
-            field("Host", text: $host, placeholder: "e.g. 192.168.1.5 or 100.x.x.x", keyboard: .URL)
-            field("Port", text: $portText, placeholder: "9877", keyboard: .numberPad)
+            Picker("Connection", selection: $transport) {
+                Text("Wi-Fi / Tailscale").tag(Transport.network)
+                Text("Bluetooth (text only)").tag(Transport.bluetooth)
+            }
+            .pickerStyle(.segmented)
+
+            if transport == .network {
+                field("Host", text: $host, placeholder: "e.g. 192.168.1.5 or 100.x.x.x", keyboard: .URL)
+                field("Port", text: $portText, placeholder: "9877", keyboard: .numberPad)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sends text to the WhisperBridge Bluetooth app on your Mac. No Wi-Fi needed. Trackpad and air mouse stay on Wi-Fi.")
+                    Text("Scan the pairing QR once (on any network) to fill in the token.")
+                    Text("Status: \(bluetoothLink.status)")
+                }
+                .font(.footnote)
+                .foregroundStyle(palette.textSecondary)
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Token")
@@ -178,7 +196,8 @@ struct SettingsView: View {
             index: index,
             host: trimmedHost,
             port: port,
-            token: token.trimmingCharacters(in: .whitespaces)
+            token: token.trimmingCharacters(in: .whitespaces),
+            transport: transport
         )
         withAnimation(Motion.tap) {
             message = "Connection saved"
@@ -193,6 +212,19 @@ struct SettingsView: View {
     }
 
     private func testConnection() {
+        if transport == .bluetooth {
+            let trimmedToken = token.trimmingCharacters(in: .whitespaces)
+            withAnimation(Motion.tap) { testing = true }
+            Task {
+                let result = await BluetoothBridge.shared.probe(token: trimmedToken)
+                withAnimation(Motion.tap) {
+                    message = result.message
+                    messageIsError = !result.ok
+                    testing = false
+                }
+            }
+            return
+        }
         let trimmedHost = host.trimmingCharacters(in: .whitespaces)
         guard !trimmedHost.isEmpty else {
             withAnimation(Motion.tap) {
@@ -236,6 +268,7 @@ struct SettingsView: View {
         host = profile?.host ?? ""
         portText = profile.map { String($0.port) } ?? "9877"
         token = profile?.token ?? ""
+        transport = profile?.transport ?? .network
         selectedMode = theme.mode
         selectedAccent = theme.accentHex
     }
