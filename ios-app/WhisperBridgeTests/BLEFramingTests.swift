@@ -43,7 +43,7 @@ final class BLEFramingTests: XCTestCase {
         let chunk = Data(count: 500)
         var outcome: BLEReassembler.Outcome = .incomplete
         for i in 0..<200 {   // claims 1000 chunks, never finishes; > 64 KB must be dropped
-            var f = Data([1, 0, 9, UInt8(i >> 8), UInt8(i & 0xFF), 0x03, 0xE8])
+            var f = Data([2, 0, 9, UInt8(i >> 8), UInt8(i & 0xFF), 0x03, 0xE8])
             f.append(chunk)
             outcome = r.add(f)
             if case .rejected = outcome { break }
@@ -65,22 +65,22 @@ final class BLEFramingTests: XCTestCase {
     func testMalformedFramesRejected() {
         var r = BLEReassembler()
         XCTAssertEqual(r.add(Data([1, 0])), .rejected(id: nil, reason: "Malformed chunk"))
-        XCTAssertEqual(r.add(Data([2, 0, 1, 0, 0, 0, 1, 65])), .rejected(id: nil, reason: "Malformed chunk"))   // bad version
-        XCTAssertEqual(r.add(Data([1, 0, 1, 0, 2, 0, 1, 65])), .rejected(id: nil, reason: "Malformed chunk"))   // index >= count
+        XCTAssertEqual(r.add(Data([3, 0, 1, 0, 0, 0, 1, 65])), .rejected(id: nil, reason: "Malformed chunk"))   // bad version
+        XCTAssertEqual(r.add(Data([2, 0, 1, 0, 2, 0, 1, 65])), .rejected(id: nil, reason: "Malformed chunk"))   // index >= count
     }
 
     func testOnlyTextModesAllowed() {
         for mode in ["type", "clipboard", "append", "enter"] {
-            XCTAssertNil(BLETextMessage(text: "hi", mode: mode, token: "t").rejectionReason)
+            XCTAssertNil(BLETextMessage(text: "hi", mode: mode).rejectionReason)
         }
-        XCTAssertNil(BLETextMessage(kind: "probe", text: "", token: "t").rejectionReason)
-        XCTAssertNotNil(BLETextMessage(text: "", mode: "move", token: "t").rejectionReason)
-        XCTAssertNotNil(BLETextMessage(kind: "control", text: "", token: "t").rejectionReason)
+        XCTAssertNil(BLETextMessage(kind: "probe", text: "").rejectionReason)
+        XCTAssertNotNil(BLETextMessage(text: "", mode: "move").rejectionReason)
+        XCTAssertNotNil(BLETextMessage(kind: "control", text: "").rejectionReason)
     }
 
     func testMessageJSONUsesReceiverFieldNames() throws {
         let json = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(BLETextMessage(text: "a", mode: "type", enterAfter: true, token: "t"))
+            with: JSONEncoder().encode(BLETextMessage(text: "a", mode: "type", enterAfter: true))
         ) as? [String: Any]
         XCTAssertEqual(json?["enter_after"] as? Bool, true)
         XCTAssertNil(json?["enterAfter"])
@@ -93,5 +93,36 @@ final class BLEFramingTests: XCTestCase {
         XCTAssertEqual(profiles.first?.isConfigured, true)
         XCTAssertTrue(Profile(name: "BT", transport: .bluetooth).isConfigured)
         XCTAssertFalse(Profile(name: "Empty").isConfigured)
+    }
+
+    func testSealOpenRoundTripAndWrongKey() throws {
+        let key = BLESecurity.key(token: "receiver-token")
+        let plain = Data("hello ✈️".utf8)
+        let sealed = try BLESecurity.seal(plain, key: key, direction: .message)
+        XCTAssertEqual(sealed.first, BLESecurity.version)
+        XCTAssertNil(sealed.range(of: plain))                       // text is not readable on the air
+        XCTAssertEqual(try BLESecurity.open(sealed, key: key, direction: .message), plain)
+        XCTAssertThrowsError(try BLESecurity.open(sealed, key: BLESecurity.key(token: "other"), direction: .message)) {
+            XCTAssertEqual($0 as? BLESecurity.Failure, .wrongKey)
+        }
+        // A message can't be reflected back as an ack.
+        XCTAssertThrowsError(try BLESecurity.open(sealed, key: key, direction: .ack))
+        var tampered = sealed
+        tampered[tampered.count - 1] ^= 0x01
+        XCTAssertThrowsError(try BLESecurity.open(tampered, key: key, direction: .message))
+        XCTAssertThrowsError(try BLESecurity.open(Data([2, 1, 2]), key: key, direction: .message)) {
+            XCTAssertEqual($0 as? BLESecurity.Failure, .malformed)
+        }
+        XCTAssertNoThrow(try BLESecurity.seal(plain, key: BLESecurity.key(token: ""), direction: .message))
+    }
+
+    func testReplayGuard() {
+        var guardian = BLEReplayGuard()
+        let now = Date()
+        let nonce = Data(repeating: 7, count: 12)
+        XCTAssertNil(guardian.accept(nonce: nonce, sentAt: now.timeIntervalSince1970, now: now))
+        XCTAssertEqual(guardian.accept(nonce: nonce, sentAt: now.timeIntervalSince1970, now: now), .replayed)
+        XCTAssertEqual(guardian.accept(nonce: Data(repeating: 8, count: 12),
+                                       sentAt: now.timeIntervalSince1970 - 600, now: now), .stale)
     }
 }

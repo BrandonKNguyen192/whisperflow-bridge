@@ -3,10 +3,13 @@ import XCTest
 
 final class BridgeBLECoreTests: XCTestCase {
     private func encode(_ m: BLETextMessage) -> Data { try! JSONEncoder().encode(m) }
+    private func sealed(_ m: BLETextMessage, token: String = "tok") -> Data {
+        try! BLESecurity.seal(encode(m), key: BLESecurity.key(token: token), direction: .message)
+    }
 
     func testFramesFromPhoneReassembleOnMac() throws {
         let text = String(repeating: "héllo wörld 👋 ", count: 300)
-        let payload = encode(BLETextMessage(text: text, mode: "type", token: "tok"))
+        let payload = sealed(BLETextMessage(text: text, mode: "type"))
         let frames = try BLEFraming.frames(payload: payload, messageID: 42, maxWrite: 185)
         var r = BLEReassembler()
         var out: BLEReassembler.Outcome = .incomplete
@@ -14,10 +17,13 @@ final class BridgeBLECoreTests: XCTestCase {
         XCTAssertEqual(out, .complete(id: 42, payload: payload))
     }
 
-    func testForwardBuildsReceiverRequest() throws {
+    func testForwardBuildsReceiverRequestWithFileToken() throws {
+        var replay = BLEReplayGuard()
         let decision = ReceiverForwarder(port: 9877).decide(
-            payload: encode(BLETextMessage(text: "hi", mode: "clipboard", enterAfter: true, token: "secret")))
-        guard case .forward(let req) = decision else { return XCTFail("refused") }
+            sealed: sealed(BLETextMessage(text: "hi", mode: "clipboard", enterAfter: true), token: "secret"),
+            token: "secret", replay: &replay)
+        guard case .forward(let req, let isProbe) = decision else { return XCTFail("refused: \(decision)") }
+        XCTAssertFalse(isProbe)
         XCTAssertEqual(req.url?.absoluteString, "http://127.0.0.1:9877/send")
         XCTAssertEqual(req.httpMethod, "POST")
         XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
@@ -28,25 +34,50 @@ final class BridgeBLECoreTests: XCTestCase {
         XCTAssertEqual(body["source"] as? String, "ios-bluetooth")
     }
 
+    func testWrongTokenStaleAndReplayRefused() {
+        let f = ReceiverForwarder()
+        var replay = BLEReplayGuard()
+        guard case .refuse(let wrong) = f.decide(sealed: sealed(BLETextMessage(text: "x"), token: "old"),
+                                                 token: "new", replay: &replay) else { return XCTFail() }
+        XCTAssertTrue(wrong.contains("Pair iPhone"))
+        let stale = sealed(BLETextMessage(text: "x", sentAt: Date().timeIntervalSince1970 - 3600))
+        XCTAssertEqual(f.decide(sealed: stale, token: "tok", replay: &replay),
+                       .refuse("Message too old — check the iPhone and Mac clocks"))
+        let once = sealed(BLETextMessage(text: "x"))
+        if case .refuse = f.decide(sealed: once, token: "tok", replay: &replay) { XCTFail() }
+        XCTAssertEqual(f.decide(sealed: once, token: "tok", replay: &replay), .refuse("Duplicate message ignored"))
+    }
+
     func testProbeSendsEmptyText() throws {
-        guard case .forward(let req) = ReceiverForwarder().decide(
-            payload: encode(BLETextMessage(kind: "probe", text: "", token: "t"))) else { return XCTFail() }
+        var replay = BLEReplayGuard()
+        guard case .forward(let req, let isProbe) = ReceiverForwarder().decide(
+            sealed: sealed(BLETextMessage(kind: "probe", text: "")), token: "tok", replay: &replay) else { return XCTFail() }
+        XCTAssertTrue(isProbe)
         let body = try JSONSerialization.jsonObject(with: req.httpBody!) as! [String: Any]
         XCTAssertEqual(body.count, 1)
         XCTAssertEqual(body["text"] as? String, "")
     }
 
     func testNoTokenNoAuthHeader() {
-        guard case .forward(let req) = ReceiverForwarder().decide(
-            payload: encode(BLETextMessage(text: "x", token: ""))) else { return XCTFail() }
+        var replay = BLEReplayGuard()
+        guard case .forward(let req, _) = ReceiverForwarder().decide(
+            sealed: sealed(BLETextMessage(text: "x"), token: ""), token: "", replay: &replay) else { return XCTFail() }
         XCTAssertNil(req.value(forHTTPHeaderField: "Authorization"))
     }
 
     func testTrackpadAndUnknownRefused() {
         let f = ReceiverForwarder()
-        if case .forward = f.decide(payload: encode(BLETextMessage(text: "", mode: "move", token: "t"))) { XCTFail() }
-        if case .forward = f.decide(payload: encode(BLETextMessage(kind: "control", text: "", token: "t"))) { XCTFail() }
-        XCTAssertEqual(f.decide(payload: Data("{}".utf8)), .refuse("Unreadable message"))
+        var replay = BLEReplayGuard()
+        if case .forward = f.decide(sealed: sealed(BLETextMessage(text: "", mode: "move")), token: "tok", replay: &replay) { XCTFail() }
+        if case .forward = f.decide(sealed: sealed(BLETextMessage(kind: "control", text: "")), token: "tok", replay: &replay) { XCTFail() }
+        if case .forward = f.decide(sealed: Data("{}".utf8), token: "tok", replay: &replay) { XCTFail() }
+    }
+
+    func testAckIsSealed() throws {
+        let ack = BLEAck(id: 3, ok: true, message: "Sent 2 chars over Bluetooth")
+        let data = try XCTUnwrap(ReceiverForwarder.seal(ack, token: "tok"))
+        let plain = try BLESecurity.open(data, key: BLESecurity.key(token: "tok"), direction: .ack)
+        XCTAssertEqual(try JSONDecoder().decode(BLEAck.self, from: plain), ack)
     }
 
     func testAckMapping() {

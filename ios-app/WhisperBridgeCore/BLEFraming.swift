@@ -3,10 +3,11 @@ import Foundation
 /// Bluetooth (text-only) wire format shared by the iOS app and the Mac helper
 /// (`mac-bluetooth/`, which compiles this same file through a symlink).
 ///
-/// A message is one JSON object (`BLETextMessage`), split into chunks that each
-/// fit one GATT write. Every chunk starts with a 7-byte header:
+/// A message is one JSON object (`BLETextMessage`), sealed with `BLESecurity`
+/// (AES-GCM keyed by the receiver token), then split into chunks that each fit
+/// one GATT write. Every chunk starts with a 7-byte header:
 ///
-///     byte 0      version (1)
+///     byte 0      version (2)
 ///     bytes 1-2   message id   (UInt16, big endian)
 ///     bytes 3-4   chunk index  (UInt16, big endian, 0-based)
 ///     bytes 5-6   chunk count  (UInt16, big endian)
@@ -15,7 +16,7 @@ import Foundation
 /// over Bluetooth: trackpad, air mouse and any other `/control` command are
 /// rejected on both ends.
 public enum BLEProtocol {
-    public static let version: UInt8 = 1
+    public static let version: UInt8 = 2
     public static let headerSize = 7
     /// Largest reassembled message the Mac accepts.
     public static let maxMessageBytes = 64 * 1024
@@ -23,9 +24,9 @@ public enum BLEProtocol {
     public static let reassemblyTimeout: TimeInterval = 10
 
     public static let serviceUUID = "6E1B0001-7A3C-4F5D-9B21-57A1B7E0B4C1"
-    /// iPhone → Mac framed message chunks (write with response, encryption required).
+    /// iPhone → Mac framed, sealed message chunks (write with response).
     public static let messageCharacteristicUUID = "6E1B0002-7A3C-4F5D-9B21-57A1B7E0B4C1"
-    /// Mac → iPhone acknowledgements (notify): `BLEAck` JSON.
+    /// Mac → iPhone acknowledgements (notify): sealed `BLEAck` JSON.
     public static let ackCharacteristicUUID = "6E1B0003-7A3C-4F5D-9B21-57A1B7E0B4C1"
 
     /// Text modes the receiver's `/send` accepts. Nothing else crosses Bluetooth.
@@ -33,25 +34,30 @@ public enum BLEProtocol {
 }
 
 /// What the iPhone sends. `kind` is "send" (deliver text) or "probe" (check the
-/// token without typing anything, like the Wi-Fi Test button).
+/// token without typing anything, like the Wi-Fi Test button). The token is
+/// not in the message: knowing it is proven by the `BLESecurity` seal, and the
+/// Mac helper forwards with the receiver's own token file.
 public struct BLETextMessage: Codable, Equatable {
     public var kind: String
     public var text: String
     public var mode: String
     public var enterAfter: Bool
-    public var token: String
+    /// Unix time when sealed; the Mac rejects messages more than 5 min off.
+    public var sentAt: TimeInterval
 
-    public init(kind: String = "send", text: String, mode: String = "type", enterAfter: Bool = false, token: String) {
+    public init(kind: String = "send", text: String, mode: String = "type", enterAfter: Bool = false,
+                sentAt: TimeInterval = Date().timeIntervalSince1970) {
         self.kind = kind
         self.text = text
         self.mode = mode
         self.enterAfter = enterAfter
-        self.token = token
+        self.sentAt = sentAt
     }
 
     enum CodingKeys: String, CodingKey {
-        case kind, text, mode, token
+        case kind, text, mode
         case enterAfter = "enter_after"
+        case sentAt = "ts"
     }
 
     /// Nil when the message may be forwarded; otherwise why it is refused.

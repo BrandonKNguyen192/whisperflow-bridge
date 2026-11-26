@@ -189,7 +189,7 @@ Mac helper.
    `mac-bluetooth/build/WhisperBridge Bluetooth.app`. Allow Bluetooth when asked.
 3. Helper menu → **Pair iPhone…**, then on the iPhone Settings → **Scan**. This
    creates and selects a "<Mac> · Bluetooth" profile, no switching needed.
-4. Tap **Test**. Accept the Bluetooth pairing prompt on both devices the first time.
+4. Tap **Test** (no Bluetooth pairing prompt: the QR's token encrypts every message).
    A blue **Bluetooth** pill on the main screen shows the mode and link state.
 
 See [mac-bluetooth/README.md](mac-bluetooth/README.md) for details and limits.

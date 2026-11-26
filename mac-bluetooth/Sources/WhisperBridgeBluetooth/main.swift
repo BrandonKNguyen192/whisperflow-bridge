@@ -25,6 +25,7 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
     private var manager: CBPeripheralManager!
     private var ackChar: CBMutableCharacteristic!
     private var reassembler = BLEReassembler()
+    private var replay = BLEReplayGuard()
     private var pendingAcks: [(Data, CBCentral?)] = []
     private var subscribers = Set<UUID>()
     private var radio: RadioState = .starting { didSet { refresh() } }
@@ -54,10 +55,14 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         let pair = NSMenuItem(title: "Pair iPhone…", action: #selector(showPairWindow), keyEquivalent: "p")
         pair.target = self
         menu.addItem(pair)
+        let logItem = NSMenuItem(title: "Show Log", action: #selector(showLog), keyEquivalent: "l")
+        logItem.target = self
+        menu.addItem(logItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
         refresh()
+        Log.write("launched v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?") on \(macName), receiver port \(port), token file \(PairingLink.readToken().isEmpty ? "MISSING" : "present")")
 
         manager = CBPeripheralManager(delegate: self, queue: .main)
         checkReceiver()
@@ -112,8 +117,15 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         request.httpMethod = "GET"
         URLSession.shared.dataTask(with: request) { [weak self] _, response, _ in
             let up = (response as? HTTPURLResponse)?.statusCode == 200
-            DispatchQueue.main.async { self?.receiverUp = up }
+            DispatchQueue.main.async {
+                if self?.receiverUp != up { Log.write("receiver /health: \(up ? "up" : "DOWN")") }
+                self?.receiverUp = up
+            }
         }.resume()
+    }
+
+    @objc private func showLog() {
+        NSWorkspace.shared.open(Log.url)
     }
 
     @objc private func openPrivacy() {
@@ -187,7 +199,9 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
     // MARK: - Peripheral
 
     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
-        NSLog("WhisperBridge Bluetooth: state %ld", peripheral.state.rawValue)
+        let names: [CBManagerState: String] = [.unknown: "unknown", .resetting: "resetting", .unsupported: "unsupported",
+                                               .unauthorized: "UNAUTHORIZED", .poweredOff: "poweredOff", .poweredOn: "poweredOn"]
+        Log.write("bluetooth state: \(names[peripheral.state] ?? "\(peripheral.state.rawValue)") (authorization \(CBManager.authorization.rawValue))")
         switch peripheral.state {
         case .poweredOn:
             publish()
@@ -208,12 +222,14 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
             type: CBUUID(string: BLEProtocol.messageCharacteristicUUID),
             properties: [.write],
             value: nil,
-            permissions: [.writeEncryptionRequired])   // forces Bluetooth pairing before any text arrives
+            // Open at the GATT level: messages are sealed with BLESecurity (key from the
+            // receiver token), so no OS pairing prompt is needed between the iPhone and Mac.
+            permissions: [.writeable])
         ackChar = CBMutableCharacteristic(
             type: CBUUID(string: BLEProtocol.ackCharacteristicUUID),
             properties: [.notify],
             value: nil,
-            permissions: [.readEncryptionRequired])
+            permissions: [.readable])
         let service = CBMutableService(type: CBUUID(string: BLEProtocol.serviceUUID), primary: true)
         service.characteristics = [message, ackChar]
         manager.removeAllServices()
@@ -221,7 +237,12 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
-        if let error { radio = .failed("Bluetooth setup failed: \(error.localizedDescription)"); return }
+        if let error {
+            Log.write("add service FAILED: \(Log.describe(error))")
+            radio = .failed("Bluetooth setup failed: \(error.localizedDescription)")
+            return
+        }
+        Log.write("service added")
         let name = "WhisperBridge \(macName)".prefix(28)
         peripheral.startAdvertising([
             CBAdvertisementDataServiceUUIDsKey: [CBUUID(string: BLEProtocol.serviceUUID)],
@@ -231,9 +252,10 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
 
     func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
         if let error {
-            NSLog("WhisperBridge Bluetooth: advertising failed: %@", error.localizedDescription)
+            Log.write("advertising FAILED: \(Log.describe(error))")
             radio = .failed("Advertising failed: \(error.localizedDescription)")
         } else {
+            Log.write("advertising as \"WhisperBridge \(macName)\"")
             radio = .advertising
         }
     }
@@ -241,6 +263,7 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
                            didSubscribeTo characteristic: CBCharacteristic) {
         subscribers.insert(central.identifier)
+        Log.write("central \(central.identifier.uuidString.prefix(8)) subscribed (max update \(central.maximumUpdateValueLength) bytes); \(subscribers.count) connected")
         peripheral.setDesiredConnectionLatency(.low, for: central)
         refresh()
     }
@@ -248,14 +271,18 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
                            didUnsubscribeFrom characteristic: CBCharacteristic) {
         subscribers.remove(central.identifier)
+        Log.write("central \(central.identifier.uuidString.prefix(8)) unsubscribed; \(subscribers.count) connected")
         refresh()
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
         reassembler.expire(now: Date())   // drop half-sent messages older than the timeout
+        let bytes = requests.reduce(0) { $0 + ($1.value?.count ?? 0) }
+        Log.write("write: \(requests.count) request(s), \(bytes) bytes from \(requests[0].central.identifier.uuidString.prefix(8))")
         for request in requests {
             guard request.characteristic.uuid == CBUUID(string: BLEProtocol.messageCharacteristicUUID),
                   let value = request.value else {
+                Log.write("write REFUSED: unexpected characteristic \(request.characteristic.uuid)")
                 peripheral.respond(to: requests[0], withResult: .requestNotSupported)
                 return
             }
@@ -263,39 +290,48 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
             case .incomplete:
                 break
             case .complete(let id, let payload):
+                Log.write("message \(id) complete: \(payload.count) bytes sealed")
                 handle(id: id, payload: payload, from: request.central)
             case .rejected(let id, let reason):
-                if let id { sendAck(BLEAck(id: id, ok: false, message: reason), to: request.central) }
+                Log.write("message \(id.map(String.init) ?? "?") rejected by framing: \(reason)")
+                if let id { sendAck(BLEAck(id: id, ok: false, message: reason), to: request.central, sealed: false) }
             }
         }
         peripheral.respond(to: requests[0], withResult: .success)
     }
 
     private func handle(id: UInt16, payload: Data, from central: CBCentral) {
-        let isProbe = ReceiverForwarder.isProbe(payload)
-        switch forwarder.decide(payload: payload) {
+        // Read per message so a re-paired or rotated receiver token applies at once.
+        let token = PairingLink.readToken()
+        switch forwarder.decide(sealed: payload, token: token, replay: &replay) {
         case .refuse(let reason):
+            Log.write("message \(id) refused: \(reason)")
             lastMessage = (Date(), "refused — \(reason)")
-            sendAck(BLEAck(id: id, ok: false, message: reason), to: central)
-        case .forward(let request):
+            // Plain (unsealed) error ack: the iPhone may hold the wrong key. It only
+            // accepts unsealed acks that report failure, so this can't fake "Sent".
+            sendAck(BLEAck(id: id, ok: false, message: reason), to: central, sealed: false)
+        case .forward(let request, let isProbe):
             URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 let status = (response as? HTTPURLResponse)?.statusCode
                 let ack = ReceiverForwarder.ack(id: id, isProbe: isProbe, status: status, body: data,
                                                 error: error?.localizedDescription)
                 DispatchQueue.main.async {
                     guard let self else { return }
+                    Log.write("message \(id) \(isProbe ? "probe" : "send") → receiver HTTP \(status.map(String.init) ?? "no answer (\(error?.localizedDescription ?? "?"))") → ack ok=\(ack.ok)")
                     self.receiverUp = status != nil
                     self.lastMessage = (Date(), isProbe ? "Test from iPhone — \(ack.message)" : ack.message)
-                    self.sendAck(ack, to: central)
+                    self.sendAck(ack, to: central, sealed: true, token: token)
                 }
             }.resume()
         }
     }
 
-    private func sendAck(_ ack: BLEAck, to central: CBCentral?) {
-        guard let data = try? JSONEncoder().encode(ack) else { return }
+    private func sendAck(_ ack: BLEAck, to central: CBCentral?, sealed: Bool, token: String = "") {
+        let data = sealed ? ReceiverForwarder.seal(ack, token: token) : try? JSONEncoder().encode(ack)
+        guard let data else { return }
         let targets = central.map { [$0] }
         if !manager.updateValue(data, for: ackChar, onSubscribedCentrals: targets) {
+            Log.write("ack \(ack.id) queued (transmit queue full)", verbose: true)
             pendingAcks.append((data, central))   // queue full; retried when ready
         }
     }
@@ -305,6 +341,41 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
             guard peripheral.updateValue(data, for: ackChar, onSubscribedCentrals: central.map { [$0] }) else { return }
             pendingAcks.removeFirst()
         }
+    }
+}
+
+/// Append-only diagnostics log at ~/Library/Logs/WhisperBridgeBluetooth.log.
+/// State transitions, connections, sizes and HTTP statuses only: never the
+/// token or message text. Rotates at 1 MB (one previous file kept).
+enum Log {
+    static let url = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/WhisperBridgeBluetooth.log")
+    private static let formatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    static var verboseEnabled = UserDefaults.standard.bool(forKey: "verboseLog")
+
+    static func write(_ line: String, verbose: Bool = false) {
+        if verbose && !verboseEnabled { return }
+        let entry = "\(formatter.string(from: Date())) \(line)\n"
+        let fm = FileManager.default
+        if let size = (try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 1_000_000 {
+            let old = url.appendingPathExtension("1")
+            try? fm.removeItem(at: old)
+            try? fm.moveItem(at: url, to: old)
+        }
+        if !fm.fileExists(atPath: url.path) { fm.createFile(atPath: url.path, contents: nil) }
+        guard let handle = try? FileHandle(forWritingTo: url) else { return }
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data(entry.utf8))
+    }
+
+    static func describe(_ error: Error) -> String {
+        let ns = error as NSError
+        return "\(ns.domain) \(ns.code): \(ns.localizedDescription)"
     }
 }
 

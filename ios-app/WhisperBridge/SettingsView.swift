@@ -92,6 +92,29 @@ struct SettingsView: View {
                               systemImage: "qrcode")
                             .foregroundStyle(accent)
                     }
+                    DisclosureGroup("Bluetooth diagnostics") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ScrollView {
+                                Text(bluetoothLink.diagnostics.suffix(60).joined(separator: "\n").ifEmpty("No events yet — tap Test."))
+                                    .font(.caption2.monospaced())
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxHeight: 220)
+                            HStack {
+                                Button("Copy log") {
+                                    UIPasteboard.general.string = bluetoothLink.diagnostics.joined(separator: "\n")
+                                    message = "Diagnostics copied"
+                                    messageIsError = false
+                                }
+                                Spacer()
+                                Button("Clear", role: .destructive) { bluetoothLink.clearDiagnostics() }
+                            }
+                            .font(.footnote.weight(.semibold))
+                        }
+                        .padding(.top, 6)
+                    }
+                    .tint(accent)
                 }
                 .font(.footnote)
                 .foregroundStyle(palette.textSecondary)
@@ -510,4 +533,8 @@ private struct GlassChoiceStyle: PrimitiveButtonStyle {
             Button(configuration).buttonStyle(.glass)
         }
     }
+}
+
+private extension String {
+    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }

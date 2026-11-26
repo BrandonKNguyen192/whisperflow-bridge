@@ -3,7 +3,8 @@ import Foundation
 /// Turns a reassembled Bluetooth message into the existing receiver's HTTP
 /// contract (`POST /send` on 127.0.0.1, same JSON and Bearer token as the
 /// Wi-Fi apps) and maps the answer to a `BLEAck`. The helper keeps no secrets:
-/// the token arrives inside each message and the receiver still checks it.
+/// the token is read from the receiver's token file per message, and the
+/// iPhone proves it knows the same token by sealing messages with it.
 public struct ReceiverForwarder {
     public var port: Int
     public var timeout: TimeInterval
@@ -14,17 +15,35 @@ public struct ReceiverForwarder {
     }
 
     public enum Decision: Equatable {
-        case forward(URLRequest)
+        case forward(URLRequest, isProbe: Bool)
         case refuse(String)
     }
 
-    /// Builds the request, or refuses anything that isn't text.
-    public func decide(payload: Data) -> Decision {
-        guard let message = try? JSONDecoder().decode(BLETextMessage.self, from: payload) else {
+    /// Opens a sealed message with the key from the receiver token, checks
+    /// freshness and replay, refuses anything that isn't text, and builds the
+    /// receiver request (authorised with the receiver's own token).
+    public func decide(sealed: Data, token: String, replay: inout BLEReplayGuard, now: Date = Date()) -> Decision {
+        let plain: Data
+        do {
+            plain = try BLESecurity.open(sealed, key: BLESecurity.key(token: token), direction: .message)
+        } catch BLESecurity.Failure.wrongKey {
+            return .refuse("Wrong pairing — on the Mac open Pair iPhone… and scan the QR again")
+        } catch {
+            return .refuse("Unreadable message — update Whisper Bridge on the iPhone and the Mac")
+        }
+        guard let message = try? JSONDecoder().decode(BLETextMessage.self, from: plain) else {
             return .refuse("Unreadable message")
         }
+        switch replay.accept(nonce: BLESecurity.nonce(of: sealed) ?? Data(), sentAt: message.sentAt, now: now) {
+        case .stale?: return .refuse("Message too old — check the iPhone and Mac clocks")
+        case .replayed?: return .refuse("Duplicate message ignored")
+        default: break
+        }
         if let reason = message.rejectionReason { return .refuse(reason) }
+        return .forward(request(for: message, token: token), isProbe: message.kind == "probe")
+    }
 
+    public func request(for message: BLETextMessage, token: String) -> URLRequest {
         var url = URLComponents()
         url.scheme = "http"
         url.host = "127.0.0.1"
@@ -33,15 +52,21 @@ public struct ReceiverForwarder {
         var request = URLRequest(url: url.url!, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !message.token.isEmpty {
-            request.setValue("Bearer \(message.token)", forHTTPHeaderField: "Authorization")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         let body: [String: Any] = message.kind == "probe"
             ? ["text": ""]   // same side-effect-free probe the iOS Test button uses over Wi-Fi
             : ["text": message.text, "mode": message.mode, "source": "ios-bluetooth",
                "enter_after": message.enterAfter]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        return .forward(request)
+        return request
+    }
+
+    /// Acks are sealed too, so a nearby device can't fake "Sent".
+    public static func seal(_ ack: BLEAck, token: String) -> Data? {
+        guard let json = try? JSONEncoder().encode(ack) else { return nil }
+        return try? BLESecurity.seal(json, key: BLESecurity.key(token: token), direction: .ack)
     }
 
     /// Maps the receiver's answer to an ack. `isProbe` mirrors BridgeClient.probe:
@@ -52,7 +77,7 @@ public struct ReceiverForwarder {
                           message: "Mac receiver not running (\(error ?? "no answer")) — start Whisper Bridge on the Mac")
         }
         let json = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-        if status == 401 { return BLEAck(id: id, ok: false, message: "Bad token — scan the pairing QR again") }
+        if status == 401 { return BLEAck(id: id, ok: false, message: "Receiver rejected the token in ~/.config/whisperbridge/token — restart Whisper Bridge on the Mac") }
         if isProbe {
             return status < 500 ? BLEAck(id: id, ok: true, message: "Connected")
                                 : BLEAck(id: id, ok: false, message: "HTTP \(status)")
@@ -67,7 +92,4 @@ public struct ReceiverForwarder {
         return BLEAck(id: id, ok: false, message: (200...299).contains(status) ? "Receiver error" : "HTTP \(status)")
     }
 
-    public static func isProbe(_ payload: Data) -> Bool {
-        (try? JSONDecoder().decode(BLETextMessage.self, from: payload))?.kind == "probe"
-    }
 }

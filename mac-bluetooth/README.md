@@ -32,8 +32,8 @@ The helper has no login item. Open it when you need it; quit from its menu.
    `~/.config/whisperbridge/token` plus `transport=bluetooth`). On the iPhone:
    Settings → **Scan**. It creates "<Mac> · Bluetooth" and selects it.
    **Copy link** works too: paste it with "Paste pairing link".
-4. Tap **Test** on the iPhone and accept the pairing prompt on both devices.
-   After this, pairing is remembered.
+4. Tap **Test** on the iPhone. There is no Bluetooth pairing prompt: the QR's
+   token is the pairing (see "How it works").
 
 The menu shows the Bluetooth state, whether an iPhone is connected, whether the
 receiver on port 9877 answers, and the last message. The iPhone shows a blue
@@ -48,15 +48,28 @@ open the app on the iPhone, dictate and send. The menu bar item shows
 
 ## How it works
 
-- Custom GATT service `6E1B0001-7A3C-4F5D-9B21-57A1B7E0B4C1`. The message
-  characteristic requires encryption, so text and token only travel on a
-  paired, encrypted link. The Mac sends an ack per message on a notify
-  characteristic.
-- Messages are JSON, split into frames with a 7‑byte header (version, message
-  id, chunk index, chunk count). The helper reassembles them with a 64 KB cap
-  and a 10 s timeout. `BLEFraming.swift` is shared with the iOS app (symlink).
-- The helper keeps nothing on disk. The receiver checks the token as usual.
+- Custom GATT service `6E1B0001-7A3C-4F5D-9B21-57A1B7E0B4C1`: a write
+  characteristic for message frames and a notify characteristic for acks.
+- **Security is at the app layer, not OS pairing.** An iPhone and a Mac on the
+  same Apple ID already share Continuity keys and an LE link, and
+  encryption-required characteristics there stall or never prompt. Instead each
+  message is sealed with AES-GCM using `HKDF-SHA256(receiver token)`. Only a
+  phone that scanned the QR can send; nobody nearby can read the text; the
+  token itself never crosses the air. Messages older than 5 minutes or replayed
+  are refused, and acks are sealed too. The helper forwards with the token in
+  `~/.config/whisperbridge/token` (read per message).
+- Frames have a 7‑byte header (version 2, message id, chunk index, chunk
+  count). Reassembly caps at 64 KB with a 10 s timeout. `BLEFraming.swift` and
+  `BLESecurity.swift` are shared with the iOS app (symlinks).
 - Receiver on another port: `defaults write com.whisperbridge.bluetooth receiverPort -int 9878`.
+
+## Troubleshooting
+
+- Mac: menu → **Show Log** opens `~/Library/Logs/WhisperBridgeBluetooth.log`
+  (state changes, connections, write sizes, receiver HTTP status; never text or
+  tokens).
+- iPhone: Settings → Bluetooth profile → **Bluetooth diagnostics** → Copy log.
+  Errors include the CoreBluetooth domain and code.
 
 ## Limits
 
