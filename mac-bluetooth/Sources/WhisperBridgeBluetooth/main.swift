@@ -8,9 +8,9 @@ import CoreImage
 /// example on a plane). Text only: trackpad and air mouse stay on Wi-Fi.
 /// Every message is handed to the normal Whisper Bridge receiver on
 /// 127.0.0.1:9877, which does the typing and checks the token.
-final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CBPeripheralManagerDelegate {
+final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CBCentralManagerDelegate, CBPeripheralDelegate {
     private enum RadioState: Equatable {
-        case starting, unauthorized, poweredOff, unsupported, advertising, failed(String)
+        case starting, unauthorized, poweredOff, unsupported, scanning, failed(String)
     }
 
     private var statusItem: NSStatusItem!
@@ -22,12 +22,20 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
                                          action: #selector(openPrivacy), keyEquivalent: "")
     private var pairWindow: NSWindow?
 
-    private var manager: CBPeripheralManager!
-    private var ackChar: CBMutableCharacteristic!
-    private var reassembler = BLEReassembler()
+    /// The Mac is the Bluetooth central: it scans for iPhones advertising the
+    /// WhisperBridge service (app open on a Bluetooth profile) and connects to each.
+    private var central: CBCentralManager!
+    private final class Link {
+        let peripheral: CBPeripheral
+        var messageChar: CBCharacteristic?
+        var ackChar: CBCharacteristic?
+        var subscribed = false
+        var reassembler = BLEReassembler()
+        init(_ p: CBPeripheral) { peripheral = p }
+    }
+    private var links: [UUID: Link] = [:]
     private var replay = BLEReplayGuard()
-    private var pendingAcks: [(Data, CBCentral?)] = []
-    private var subscribers = Set<UUID>()
+    private var subscribedCount: Int { links.values.filter(\.subscribed).count }
     private var radio: RadioState = .starting { didSet { refresh() } }
     private var receiverUp: Bool? { didSet { refresh() } }
     private var lastMessage: (Date, String)? { didSet { refresh() } }
@@ -64,7 +72,7 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         refresh()
         Log.write("launched v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?") on \(macName), receiver port \(port), token file \(PairingLink.readToken().isEmpty ? "MISSING" : "present")")
 
-        manager = CBPeripheralManager(delegate: self, queue: .main)
+        central = CBCentralManager(delegate: self, queue: .main)
         checkReceiver()
         receiverTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
             self?.checkReceiver()
@@ -85,14 +93,15 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         case .poweredOff:   stateLine.title = "⚠️ Bluetooth is off"; symbol = "antenna.radiowaves.left.and.right.slash"
         case .unsupported:  stateLine.title = "⚠️ Bluetooth LE not available"; symbol = "antenna.radiowaves.left.and.right.slash"
         case .failed(let why): stateLine.title = "⚠️ \(why)"; symbol = "exclamationmark.triangle"
-        case .advertising:
-            stateLine.title = "Bluetooth: ready — visible as “WhisperBridge \(macName)”"
-            symbol = subscribers.isEmpty ? "antenna.radiowaves.left.and.right" : "iphone.radiowaves.left.and.right"
+        case .scanning:
+            stateLine.title = "Bluetooth: on — looking for iPhones with Whisper Bridge open"
+            symbol = subscribedCount == 0 ? "antenna.radiowaves.left.and.right" : "iphone.radiowaves.left.and.right"
         }
         privacyItem.isHidden = radio != .unauthorized
-        iphoneLine.title = subscribers.isEmpty
-            ? "iPhone: not connected"
-            : (subscribers.count == 1 ? "iPhone: connected" : "iPhones: \(subscribers.count) connected")
+        let connecting = links.count - subscribedCount
+        iphoneLine.title = subscribedCount == 0
+            ? (connecting > 0 ? "iPhone: connecting…" : "iPhone: not connected (open Whisper Bridge on a Bluetooth profile)")
+            : (subscribedCount == 1 ? "iPhone: connected" : "iPhones: \(subscribedCount) connected")
         switch receiverUp {
         case .none:        receiverLine.title = "Receiver (port \(port)): checking…"
         case .some(true):  receiverLine.title = "Receiver (port \(port)): reachable ✓"
@@ -108,7 +117,7 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "WhisperBridge Bluetooth")
         image?.isTemplate = true
         statusItem.button?.image = image
-        statusItem.button?.appearsDisabled = radio != .advertising
+        statusItem.button?.appearsDisabled = radio != .scanning
         statusItem.button?.toolTip = [stateLine.title, iphoneLine.title, receiverLine.title].joined(separator: "\n")
     }
 
@@ -147,8 +156,8 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         heading.font = .boldSystemFont(ofSize: 15)
         let steps = NSTextField(wrappingLabelWithString:
             "On the iPhone: Whisper Bridge → Settings → Scan, and point at this code.\n" +
-            "It creates “\(macName) · Bluetooth” and switches to it. Then tap Test and accept " +
-            "the Bluetooth pairing prompt on both devices.")
+            "It creates “\(macName) · Bluetooth” and switches to it. Keep Whisper Bridge open on the " +
+            "iPhone: this Mac connects to it within a few seconds. Then tap Test.")
         steps.preferredMaxLayoutWidth = 300
         let warning = NSTextField(wrappingLabelWithString: token.isEmpty
             ? "⚠️ No receiver token found at \(PairingLink.tokenPath). The link has no token, so sending only works if the receiver doesn't require one."
@@ -196,15 +205,18 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         return image
     }
 
-    // MARK: - Peripheral
+    // MARK: - Central
 
-    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+    private static func short(_ id: UUID) -> String { String(id.uuidString.prefix(8)) }
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
         let names: [CBManagerState: String] = [.unknown: "unknown", .resetting: "resetting", .unsupported: "unsupported",
                                                .unauthorized: "UNAUTHORIZED", .poweredOff: "poweredOff", .poweredOn: "poweredOn"]
-        Log.write("bluetooth state: \(names[peripheral.state] ?? "\(peripheral.state.rawValue)") (authorization \(CBManager.authorization.rawValue))")
-        switch peripheral.state {
+        Log.write("bluetooth state: \(names[central.state] ?? "\(central.state.rawValue)") (authorization \(CBManager.authorization.rawValue))")
+        switch central.state {
         case .poweredOn:
-            publish()
+            radio = .scanning
+            startScanning()
         case .unauthorized:
             radio = .unauthorized
         case .poweredOff:
@@ -214,93 +226,143 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
         default:
             radio = .starting
         }
-        if peripheral.state != .poweredOn { subscribers.removeAll(); refresh() }
+        if central.state != .poweredOn { links.removeAll(); refresh() }
     }
 
-    private func publish() {
-        let message = CBMutableCharacteristic(
-            type: CBUUID(string: BLEProtocol.messageCharacteristicUUID),
-            properties: [.write],
-            value: nil,
-            // Open at the GATT level: messages are sealed with BLESecurity (key from the
-            // receiver token), so no OS pairing prompt is needed between the iPhone and Mac.
-            permissions: [.writeable])
-        ackChar = CBMutableCharacteristic(
-            type: CBUUID(string: BLEProtocol.ackCharacteristicUUID),
-            properties: [.notify],
-            value: nil,
-            permissions: [.readable])
-        let service = CBMutableService(type: CBUUID(string: BLEProtocol.serviceUUID), primary: true)
-        service.characteristics = [message, ackChar]
-        manager.removeAllServices()
-        manager.add(service)
+    private func startScanning() {
+        guard central.state == .poweredOn else { return }
+        // iPhones already linked to this Mac at the system level don't show up in scans.
+        for p in central.retrieveConnectedPeripherals(withServices: [CBUUID(string: BLEProtocol.serviceUUID)])
+        where links[p.identifier] == nil {
+            Log.write("system-connected iPhone \(Self.short(p.identifier)) — connecting")
+            connect(p)
+        }
+        if !central.isScanning {
+            Log.write("scanning for iPhones")
+            central.scanForPeripherals(withServices: [CBUUID(string: BLEProtocol.serviceUUID)],
+                                       options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        }
     }
 
-    func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
-        if let error {
-            Log.write("add service FAILED: \(Log.describe(error))")
-            radio = .failed("Bluetooth setup failed: \(error.localizedDescription)")
+    private func connect(_ p: CBPeripheral) {
+        let link = Link(p)
+        links[p.identifier] = link
+        p.delegate = self
+        central.connect(p)
+        refresh()
+        // A connect that never completes is cancelled so the next advertisement retries.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            guard let self, let current = self.links[p.identifier], current === link, !link.subscribed else { return }
+            Log.write("connect/setup to \(Self.short(p.identifier)) timed out at state \(p.state.rawValue) — cancelling")
+            self.central.cancelPeripheralConnection(p)
+            self.links[p.identifier] = nil
+            self.refresh()
+            self.restartScan()
+        }
+    }
+
+    /// Scanning without duplicates reports each iPhone once; restart to see it again.
+    private func restartScan() {
+        guard central.state == .poweredOn else { return }
+        central.stopScan()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.startScanning() }
+    }
+
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
+                        advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "?"
+        guard links[peripheral.identifier] == nil else { return }
+        Log.write("didDiscover \(Self.short(peripheral.identifier)) \"\(name)\" RSSI \(RSSI) — connecting")
+        connect(peripheral)
+    }
+
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        Log.write("didConnect \(Self.short(peripheral.identifier)); max write \(peripheral.maximumWriteValueLength(for: .withResponse))")
+        peripheral.discoverServices([CBUUID(string: BLEProtocol.serviceUUID)])
+    }
+
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        Log.write("didFailToConnect \(Self.short(peripheral.identifier)): \(error.map(Log.describe) ?? "no error")")
+        links[peripheral.identifier] = nil
+        refresh()
+        restartScan()
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        Log.write("didDisconnect \(Self.short(peripheral.identifier)): \(error.map(Log.describe) ?? "clean")")
+        links[peripheral.identifier] = nil
+        refresh()
+        restartScan()   // auto-reconnect when the iPhone advertises again
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard let service = peripheral.services?.first(where: { $0.uuid == CBUUID(string: BLEProtocol.serviceUUID) }) else {
+            Log.write("service missing on \(Self.short(peripheral.identifier)): \(error.map(Log.describe) ?? "not found")")
+            central.cancelPeripheralConnection(peripheral)
             return
         }
-        Log.write("service added")
-        let name = "WhisperBridge \(macName)".prefix(28)
-        peripheral.startAdvertising([
-            CBAdvertisementDataServiceUUIDsKey: [CBUUID(string: BLEProtocol.serviceUUID)],
-            CBAdvertisementDataLocalNameKey: String(name),
-        ])
+        peripheral.discoverCharacteristics([CBUUID(string: BLEProtocol.messageCharacteristicUUID),
+                                            CBUUID(string: BLEProtocol.ackCharacteristicUUID)], for: service)
     }
 
-    func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard let link = links[peripheral.identifier] else { return }
+        link.messageChar = service.characteristics?.first { $0.uuid == CBUUID(string: BLEProtocol.messageCharacteristicUUID) }
+        link.ackChar = service.characteristics?.first { $0.uuid == CBUUID(string: BLEProtocol.ackCharacteristicUUID) }
+        guard let messageChar = link.messageChar, link.ackChar != nil else {
+            Log.write("characteristics missing on \(Self.short(peripheral.identifier)): \(error.map(Log.describe) ?? "not found")")
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
+        peripheral.setNotifyValue(true, for: messageChar)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        guard let link = links[peripheral.identifier] else { return }
         if let error {
-            Log.write("advertising FAILED: \(Log.describe(error))")
-            radio = .failed("Advertising failed: \(error.localizedDescription)")
-        } else {
-            Log.write("advertising as \"WhisperBridge \(macName)\"")
-            radio = .advertising
+            Log.write("subscribe FAILED on \(Self.short(peripheral.identifier)): \(Log.describe(error))")
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
+        link.subscribed = characteristic.isNotifying
+        Log.write("subscribed to iPhone \(Self.short(peripheral.identifier)); \(subscribedCount) connected")
+        refresh()
+        // Sealed hello: tells the iPhone this Mac's name and lets it check the pairing.
+        let token = PairingLink.readToken()
+        if let hello = ReceiverForwarder.seal(.hello(mac: macName), token: token) {
+            write(hello, to: link)
         }
     }
 
-    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
-                           didSubscribeTo characteristic: CBCharacteristic) {
-        subscribers.insert(central.identifier)
-        Log.write("central \(central.identifier.uuidString.prefix(8)) subscribed (max update \(central.maximumUpdateValueLength) bytes); \(subscribers.count) connected")
-        peripheral.setDesiredConnectionLatency(.low, for: central)
-        refresh()
-    }
-
-    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
-                           didUnsubscribeFrom characteristic: CBCharacteristic) {
-        subscribers.remove(central.identifier)
-        Log.write("central \(central.identifier.uuidString.prefix(8)) unsubscribed; \(subscribers.count) connected")
-        refresh()
-    }
-
-    func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
-        reassembler.expire(now: Date())   // drop half-sent messages older than the timeout
-        let bytes = requests.reduce(0) { $0 + ($1.value?.count ?? 0) }
-        Log.write("write: \(requests.count) request(s), \(bytes) bytes from \(requests[0].central.identifier.uuidString.prefix(8))")
-        for request in requests {
-            guard request.characteristic.uuid == CBUUID(string: BLEProtocol.messageCharacteristicUUID),
-                  let value = request.value else {
-                Log.write("write REFUSED: unexpected characteristic \(request.characteristic.uuid)")
-                peripheral.respond(to: requests[0], withResult: .requestNotSupported)
-                return
-            }
-            switch reassembler.add(value) {
-            case .incomplete:
-                break
-            case .complete(let id, let payload):
-                Log.write("message \(id) complete: \(payload.count) bytes sealed")
-                handle(id: id, payload: payload, from: request.central)
-            case .rejected(let id, let reason):
-                Log.write("message \(id.map(String.init) ?? "?") rejected by framing: \(reason)")
-                if let id { sendAck(BLEAck(id: id, ok: false, message: reason), to: request.central, sealed: false) }
-            }
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard let link = links[peripheral.identifier],
+              characteristic.uuid == CBUUID(string: BLEProtocol.messageCharacteristicUUID) else { return }
+        if let error {
+            Log.write("notification error from \(Self.short(peripheral.identifier)): \(Log.describe(error))")
+            return
         }
-        peripheral.respond(to: requests[0], withResult: .success)
+        guard let value = characteristic.value else { return }
+        link.reassembler.expire(now: Date())   // drop half-sent messages older than the timeout
+        Log.write("frame: \(value.count) bytes from \(Self.short(peripheral.identifier))")
+        switch link.reassembler.add(value) {
+        case .incomplete:
+            break
+        case .complete(let id, let payload):
+            Log.write("message \(id) complete: \(payload.count) bytes sealed")
+            handle(id: id, payload: payload, link: link)
+        case .rejected(let id, let reason):
+            Log.write("message \(id.map(String.init) ?? "?") rejected by framing: \(reason)")
+            if let id { sendAck(BLEAck(id: id, ok: false, message: reason), to: link, sealed: false) }
+        }
     }
 
-    private func handle(id: UInt16, payload: Data, from central: CBCentral) {
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error {
+            Log.write("ack write FAILED to \(Self.short(peripheral.identifier)): \(Log.describe(error))")
+        }
+    }
+
+    private func handle(id: UInt16, payload: Data, link: Link) {
         // Read per message so a re-paired or rotated receiver token applies at once.
         let token = PairingLink.readToken()
         switch forwarder.decide(sealed: payload, token: token, replay: &replay) {
@@ -309,7 +371,7 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
             lastMessage = (Date(), "refused — \(reason)")
             // Plain (unsealed) error ack: the iPhone may hold the wrong key. It only
             // accepts unsealed acks that report failure, so this can't fake "Sent".
-            sendAck(BLEAck(id: id, ok: false, message: reason), to: central, sealed: false)
+            sendAck(BLEAck(id: id, ok: false, message: reason), to: link, sealed: false)
         case .forward(let request, let isProbe):
             URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 let status = (response as? HTTPURLResponse)?.statusCode
@@ -320,27 +382,24 @@ final class BluetoothHelper: NSObject, NSApplicationDelegate, NSMenuDelegate, CB
                     Log.write("message \(id) \(isProbe ? "probe" : "send") → receiver HTTP \(status.map(String.init) ?? "no answer (\(error?.localizedDescription ?? "?"))") → ack ok=\(ack.ok)")
                     self.receiverUp = status != nil
                     self.lastMessage = (Date(), isProbe ? "Test from iPhone — \(ack.message)" : ack.message)
-                    self.sendAck(ack, to: central, sealed: true, token: token)
+                    self.sendAck(ack, to: link, sealed: true, token: token)
                 }
             }.resume()
         }
     }
 
-    private func sendAck(_ ack: BLEAck, to central: CBCentral?, sealed: Bool, token: String = "") {
+    private func sendAck(_ ack: BLEAck, to link: Link, sealed: Bool, token: String = "") {
         let data = sealed ? ReceiverForwarder.seal(ack, token: token) : try? JSONEncoder().encode(ack)
         guard let data else { return }
-        let targets = central.map { [$0] }
-        if !manager.updateValue(data, for: ackChar, onSubscribedCentrals: targets) {
-            Log.write("ack \(ack.id) queued (transmit queue full)", verbose: true)
-            pendingAcks.append((data, central))   // queue full; retried when ready
-        }
+        write(data, to: link)
     }
 
-    func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
-        while let (data, central) = pendingAcks.first {
-            guard peripheral.updateValue(data, for: ackChar, onSubscribedCentrals: central.map { [$0] }) else { return }
-            pendingAcks.removeFirst()
+    private func write(_ data: Data, to link: Link) {
+        guard let ackChar = link.ackChar, link.peripheral.state == .connected else {
+            Log.write("ack dropped: iPhone \(Self.short(link.peripheral.identifier)) not connected")
+            return
         }
+        link.peripheral.writeValue(data, for: ackChar, type: .withResponse)
     }
 }
 

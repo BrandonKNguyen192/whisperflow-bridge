@@ -125,4 +125,16 @@ final class BLEFramingTests: XCTestCase {
         XCTAssertEqual(guardian.accept(nonce: Data(repeating: 8, count: 12),
                                        sentAt: now.timeIntervalSince1970 - 600, now: now), .stale)
     }
+
+    func testHelloAckRoundTripAndPlainAckCompat() throws {
+        let key = BLESecurity.key(token: "tok")
+        let sealed = try BLESecurity.seal(JSONEncoder().encode(BLEAck.hello(mac: "Brandon’s MacBook Air")),
+                                          key: key, direction: .ack)
+        let ack = try JSONDecoder().decode(BLEAck.self, from: BLESecurity.open(sealed, key: key, direction: .ack))
+        XCTAssertTrue(ack.isHello)
+        XCTAssertEqual(ack.mac, "Brandon’s MacBook Air")
+        let plain = try JSONDecoder().decode(BLEAck.self, from: Data(#"{"id":4,"ok":false,"message":"nope"}"#.utf8))
+        XCTAssertFalse(plain.isHello)
+        XCTAssertNil(plain.mac)
+    }
 }

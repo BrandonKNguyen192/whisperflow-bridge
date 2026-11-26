@@ -2,9 +2,14 @@ import CoreBluetooth
 import CryptoKit
 import Foundation
 
-/// iPhone side of the Bluetooth (text only) transport. Finds the Mac helper
-/// ("WhisperBridge Bluetooth") by its service UUID, connects, writes framed
-/// messages and waits for the matching `BLEAck`.
+/// iPhone side of the Bluetooth (text only) transport.
+///
+/// The iPhone is the Bluetooth **peripheral**: while the app is open it
+/// advertises the WhisperBridge service, and the Mac helper ("WhisperBridge
+/// Bluetooth", a central) finds it, connects and subscribes. Messages go out as
+/// notifications on the message characteristic; the Mac writes acks back.
+/// (The first design had the iPhone connect to the Mac; those connects hung
+/// between same-Apple-ID devices, so the roles were swapped.)
 ///
 /// Security is at the app layer (`BLESecurity`): every message is sealed with
 /// AES-GCM using a key derived from the receiver token from the pairing QR, so
@@ -18,40 +23,29 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     /// Coarse link state for the always-visible mode pill.
     public enum Phase: Equatable { case idle, searching, connected }
     @Published public private(set) var phase: Phase = .idle
-    /// Name the Mac helper advertises (e.g. "WhisperBridge Brandon's Air").
+    /// The Mac's name, from its sealed hello after it connects.
     @Published public private(set) var peerName: String?
+    /// True when the connected Mac's hello couldn't be opened with this profile's token.
+    @Published public private(set) var pairingMismatch = false
     /// Recent link events for Settings → Bluetooth diagnostics. No text or tokens.
     @Published public private(set) var diagnostics: [String] = []
 
-    /// Display name of the connected Mac, without the helper's prefix.
-    public var macName: String {
-        let raw = peerName ?? "Mac"
-        return raw.hasPrefix("WhisperBridge ") ? String(raw.dropFirst("WhisperBridge ".count)) : raw
-    }
+    public var macName: String { peerName ?? "Mac" }
 
-    private var central: CBCentralManager?
-    private var peripheral: CBPeripheral?
-    private var messageChar: CBCharacteristic?
-    private var ackChar: CBCharacteristic?
-    private var nextID: UInt16 = UInt16.random(in: 0...UInt16.max)
-    private var ackKey: SymmetricKey?
+    private var manager: CBPeripheralManager?
+    private var messageChar: CBMutableCharacteristic?
+    private var ackChar: CBMutableCharacteristic?
+    private var serviceAdded = false
+    private var subscriber: CBCentral?
+    private var key: SymmetricKey?
+    private var nextID: UInt16 = UInt16.random(in: 1...UInt16.max)
 
-    private var readyWaiters: [CheckedContinuation<String?, Never>] = []
-    private var writeWaiter: CheckedContinuation<Error?, Never>?
+    private var linkWaiters: [CheckedContinuation<Bool, Never>] = []
+    private var readyToSendWaiter: CheckedContinuation<Bool, Never>?
     private var ackWaiters: [UInt16: CheckedContinuation<BLEAck?, Never>] = [:]
     private var busy = false
-    private var readyGeneration = 0
-    /// How far the current attempt got, for an honest timeout message.
-    private enum Stage { case scanning, connecting, discovering, subscribing }
-    private var stage: Stage = .scanning
-    /// Connect attempts in this round; a stuck connect is cancelled and retried
-    /// once with a freshly scanned peripheral.
-    private var connectAttempts = 0
-    private var lastError: String?
 
     private let serviceUUID = CBUUID(string: BLEProtocol.serviceUUID)
-    private let messageUUID = CBUUID(string: BLEProtocol.messageCharacteristicUUID)
-    private let ackUUID = CBUUID(string: BLEProtocol.ackCharacteristicUUID)
     private let defaults = UserDefaults.standard
     private static let diagnosticsKey = "bluetooth_diagnostics"
 
@@ -70,14 +64,26 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     /// Like the Wi-Fi Test button: checks the Mac helper and the token without typing.
     public func probe(token: String) async -> BridgeClient.Result {
         await perform(BLETextMessage(kind: "probe", text: "", mode: "type"), token: token,
-                      success: { _ in "Connected over Bluetooth" })
+                      success: { _ in "Connected over Bluetooth to \(self.macName)" })
     }
 
-    /// Starts looking for the Mac helper so the mode pill shows a live state
-    /// before the first send. Silent: failures just leave it "Not connected".
-    public func warmUp() {
-        guard !busy, !connected, readyWaiters.isEmpty else { return }
-        Task { _ = await ensureReady() }
+    /// Starts advertising so the Mac helper can connect and the mode pill shows
+    /// a live state before the first send.
+    public func warmUp(token: String) {
+        key = BLESecurity.key(token: token)
+        start()
+    }
+
+    /// Stops advertising and drops the link (e.g. when a Wi-Fi profile is active).
+    public func stop() {
+        guard let manager else { return }
+        manager.stopAdvertising()
+        if serviceAdded { manager.removeAllServices() }
+        serviceAdded = false
+        subscriber = nil
+        failPending("Bluetooth stopped")
+        setStatus("Not connected", connected: false, waiting: false)
+        note("stopped advertising")
     }
 
     public func clearDiagnostics() {
@@ -87,8 +93,17 @@ public final class BluetoothBridge: NSObject, ObservableObject {
 
     // MARK: - Flow
 
+    private func start() {
+        if manager == nil {
+            note("starting peripheral")
+            manager = CBPeripheralManager(delegate: self, queue: .main)
+        } else if let manager, manager.state == .poweredOn, !manager.isAdvertising, subscriber == nil {
+            publish()
+        }
+    }
+
     private func perform(_ message: BLETextMessage, token: String,
-                         success: (BLEAck) -> String) async -> BridgeClient.Result {
+                         success: @escaping (BLEAck) -> String) async -> BridgeClient.Result {
         if let reason = message.rejectionReason {
             return .init(ok: false, message: reason)
         }
@@ -96,37 +111,62 @@ public final class BluetoothBridge: NSObject, ObservableObject {
         busy = true
         defer { busy = false }
 
-        if let problem = await ensureReady() {
-            return .init(ok: false, message: problem)
+        key = BLESecurity.key(token: token)
+        start()
+        if let problem = stateProblem() { return .init(ok: false, message: problem) }
+        if subscriber == nil {
+            setStatus("Waiting for the Mac…", connected: false, waiting: true)
+            let linked: Bool = await withCheckedContinuation { cont in
+                linkWaiters.append(cont)
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(20))
+                    self?.finishLinkWait(false)
+                }
+            }
+            guard linked, subscriber != nil else {
+                if let problem = stateProblem() { return .init(ok: false, message: problem) }
+                setStatus("Waiting for the Mac…", connected: false, waiting: false)
+                note("\(message.kind): Mac never connected within 20 s")
+                return .init(ok: false, message:
+                    "The Mac hasn't connected — open WhisperBridge Bluetooth on the Mac (menu bar), keep this screen open and the Mac within a few metres")
+            }
         }
-        guard let peripheral, let messageChar else {
-            return .init(ok: false, message: "Mac helper not found")
+        guard let manager, let messageChar, let central = subscriber, let key else {
+            return .init(ok: false, message: "Mac helper not connected")
         }
-        let key = BLESecurity.key(token: token)
+        if pairingMismatch {
+            return .init(ok: false, message: "This Mac's pairing doesn't match — on the Mac open Pair iPhone… and scan the QR again")
+        }
+
         guard let json = try? JSONEncoder().encode(message),
               let sealed = try? BLESecurity.seal(json, key: key, direction: .message) else {
             return .init(ok: false, message: "Could not encode message")
         }
-        ackKey = key
         let id = nextID
-        nextID &+= 1
-        let maxWrite = min(peripheral.maximumWriteValueLength(for: .withResponse), 512)
+        nextID = nextID == UInt16.max ? 1 : nextID + 1   // 0 is the Mac's hello
+        let maxChunk = min(central.maximumUpdateValueLength, 512)
         let frames: [Data]
         do {
-            frames = try BLEFraming.frames(payload: sealed, messageID: id, maxWrite: maxWrite)
+            frames = try BLEFraming.frames(payload: sealed, messageID: id, maxWrite: maxChunk)
         } catch {
             return .init(ok: false, message: "Text too long for Bluetooth (max 64 KB)")
         }
-        note("\(message.kind) \(id): \(sealed.count) bytes sealed in \(frames.count) frame(s) of ≤\(maxWrite)")
+        note("\(message.kind) \(id): \(sealed.count) bytes sealed in \(frames.count) frame(s) of ≤\(maxChunk)")
 
         for frame in frames {
-            let error: Error? = await withCheckedContinuation { cont in
-                writeWaiter = cont
-                peripheral.writeValue(frame, for: messageChar, type: .withResponse)
-            }
-            if let error {
-                note("write failed: \(Self.describe(error))")
-                return .init(ok: false, message: "Bluetooth write failed — \(Self.describe(error))")
+            while !manager.updateValue(frame, for: messageChar, onSubscribedCentrals: [central]) {
+                // Transmit queue full: wait for peripheralManagerIsReady.
+                let ready: Bool = await withCheckedContinuation { cont in
+                    readyToSendWaiter = cont
+                    Task { @MainActor [weak self] in
+                        try? await Task.sleep(for: .seconds(5))
+                        self?.resumeReadyToSend(false)
+                    }
+                }
+                guard ready, subscriber != nil else {
+                    note("\(message.kind) \(id): link dropped while sending")
+                    return .init(ok: false, message: "Bluetooth link dropped while sending — try again")
+                }
             }
         }
 
@@ -145,162 +185,94 @@ public final class BluetoothBridge: NSObject, ObservableObject {
         return ack.ok ? .init(ok: true, message: success(ack)) : .init(ok: false, message: ack.message)
     }
 
-    /// Returns nil when connected with both characteristics ready, else a reason.
-    private func ensureReady() async -> String? {
-        if connected, messageChar != nil, peripheral?.state == .connected { return nil }
-        if central == nil {
-            central = CBCentralManager(delegate: self, queue: .main)
-        }
-        let result: String? = await withCheckedContinuation { cont in
-            readyWaiters.append(cont)
-            guard readyWaiters.count == 1 else { return }
-            stage = .scanning
-            connectAttempts = 0
-            lastError = nil
-            armTimeout(seconds: 15)
-            startIfPossible()
-        }
-        return result
-    }
-
-    private func armTimeout(seconds: Double) {
-        readyGeneration += 1
-        let generation = readyGeneration
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
-            guard let self, self.readyGeneration == generation, !self.readyWaiters.isEmpty else { return }
-            self.timedOut()
+    private func stateProblem() -> String? {
+        guard let manager else { return nil }
+        switch manager.state {
+        case .unauthorized: return "Allow Bluetooth for Whisper Bridge in Settings → Privacy & Security → Bluetooth"
+        case .poweredOff: return "Turn Bluetooth on"
+        case .unsupported: return "Bluetooth isn't available on this device"
+        default: return nil
         }
     }
 
-    private func timedOut() {
-        note("timeout at stage \(stage) (attempt \(connectAttempts))")
-        if stage == .connecting, connectAttempts < 2, let central {
-            // A connect that never completes: drop it and try once more with a
-            // fresh advertisement (the Mac rotates its private address).
-            if let peripheral { central.cancelPeripheralConnection(peripheral) }
-            peripheral = nil
-            stage = .scanning
-            setStatus("Retrying…", connected: false)
-            armTimeout(seconds: 12)
-            central.scanForPeripherals(withServices: [serviceUUID],
-                                       options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
-            return
+    private func publish() {
+        guard let manager else { return }
+        if !serviceAdded {
+            let message = CBMutableCharacteristic(
+                type: CBUUID(string: BLEProtocol.messageCharacteristicUUID),
+                properties: [.notify], value: nil, permissions: [.readable])
+            let ack = CBMutableCharacteristic(
+                type: CBUUID(string: BLEProtocol.ackCharacteristicUUID),
+                properties: [.write], value: nil, permissions: [.writeable])
+            let service = CBMutableService(type: serviceUUID, primary: true)
+            service.characteristics = [message, ack]
+            messageChar = message
+            ackChar = ack
+            manager.removeAllServices()
+            manager.add(service)
+            return   // advertising starts in didAdd
         }
-        let detail = lastError.map { " (\($0))" } ?? ""
-        let message: String
-        switch stage {
-        case .scanning:
-            message = "Mac helper not found — open WhisperBridge Bluetooth on the Mac (menu bar) and keep Bluetooth on"
-        case .connecting:
-            message = "Found the Mac but couldn't connect\(detail) — see Settings → Bluetooth diagnostics"
-        case .discovering:
-            message = "Connected, but the helper didn't answer\(detail) — quit and reopen WhisperBridge Bluetooth on the Mac"
-        case .subscribing:
-            message = "Connected, but the helper didn't accept the link\(detail) — update WhisperBridge Bluetooth on the Mac"
-        }
-        if let peripheral, peripheral.state != .connected || messageChar == nil {
-            central?.cancelPeripheralConnection(peripheral)   // start clean next time
-        }
-        finishReady(message)
+        advertise()
     }
 
-    private func startIfPossible() {
-        guard let central else { return }
-        switch central.state {
-        case .poweredOn:
-            if let peripheral, peripheral.state == .connected {
-                discover(on: peripheral)
-            } else if let known = central.retrieveConnectedPeripherals(withServices: [serviceUUID]).first {
-                // Already linked at the system level (same Apple ID / Continuity):
-                // such peripherals don't show up in scans, so reuse the link.
-                note("reusing system-connected \(Self.short(known.identifier))")
-                peerName = peerName ?? known.name
-                connect(known)
-            } else {
-                setStatus("Searching…", connected: false)
-                note("scanning for helper service")
-                central.scanForPeripherals(withServices: [serviceUUID])
-            }
-        case .unauthorized:
-            note("central unauthorized")
-            finishReady("Allow Bluetooth for Whisper Bridge in Settings → Privacy & Security → Bluetooth")
-        case .poweredOff:
-            finishReady("Turn Bluetooth on")
-        case .unsupported:
-            finishReady("Bluetooth isn't available on this device")
-        default:
-            break // wait for centralManagerDidUpdateState
-        }
+    private func advertise() {
+        guard let manager, !manager.isAdvertising else { return }
+        manager.startAdvertising([
+            CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
+            CBAdvertisementDataLocalNameKey: "WhisperBridge iPhone",
+        ])
     }
 
-    private func connect(_ p: CBPeripheral) {
-        if let old = peripheral, old.identifier != p.identifier, old.state != .disconnected {
-            central?.cancelPeripheralConnection(old)
-        }
-        peripheral = p
-        p.delegate = self
-        stage = .connecting
-        connectAttempts += 1
-        setStatus(connectAttempts > 1 ? "Connecting (retry)…" : "Connecting…", connected: false)
-        note("connect \(Self.short(p.identifier)) attempt \(connectAttempts), state \(p.state.rawValue)")
-        if p.state == .connected {
-            discover(on: p)
-        } else {
-            armTimeout(seconds: 8)
-            central?.connect(p)
-        }
+    private func finishLinkWait(_ ok: Bool) {
+        let waiters = linkWaiters
+        linkWaiters.removeAll()
+        waiters.forEach { $0.resume(returning: ok) }
     }
 
-    private func discover(on p: CBPeripheral) {
-        stage = .discovering
-        setStatus("Finding the helper…", connected: false)
-        armTimeout(seconds: 10)
-        p.discoverServices([serviceUUID])
-    }
-
-    private func finishReady(_ problem: String?) {
-        guard !readyWaiters.isEmpty else { return }
-        readyGeneration += 1
-        let waiters = readyWaiters
-        readyWaiters.removeAll()
-        if let problem {
-            central?.stopScan()
-            note("not ready: \(problem)")
-            if !connected { setStatus("Not connected", connected: false) }
-        }
-        waiters.forEach { $0.resume(returning: problem) }
+    private func resumeReadyToSend(_ ok: Bool) {
+        readyToSendWaiter?.resume(returning: ok)
+        readyToSendWaiter = nil
     }
 
     private func resolveAck(_ id: UInt16, _ ack: BLEAck?) {
         ackWaiters.removeValue(forKey: id)?.resume(returning: ack)
     }
 
-    private func setStatus(_ text: String, connected: Bool) {
-        status = text
-        self.connected = connected
-        phase = connected ? .connected : (readyWaiters.isEmpty ? .idle : .searching)
-    }
-
-    private func dropLink(_ reason: String) {
-        messageChar = nil
-        ackChar = nil
-        setStatus(reason, connected: false)
-        writeWaiter?.resume(returning: NSError(domain: "WhisperBridge", code: 1,
-                                               userInfo: [NSLocalizedDescriptionKey: reason]))
-        writeWaiter = nil
+    private func failPending(_ reason: String) {
+        finishLinkWait(false)
+        resumeReadyToSend(false)
         for id in Array(ackWaiters.keys) { resolveAck(id, nil) }
     }
 
-    /// Accepts sealed acks; unsealed ones only when they report a failure (the
-    /// Mac sends those when it can't open our message, e.g. a wrong pairing).
-    private func decodeAck(_ data: Data) -> BLEAck? {
-        if let key = ackKey, let plain = try? BLESecurity.open(data, key: key, direction: .ack),
+    private func setStatus(_ text: String, connected: Bool, waiting: Bool) {
+        status = text
+        self.connected = connected
+        phase = connected ? .connected : (waiting ? .searching : .idle)
+    }
+
+    /// Sealed acks are trusted; unsealed ones only when they report a failure
+    /// (the Mac sends those when it can't open our message, e.g. wrong pairing).
+    private func handleAckWrite(_ data: Data) {
+        if let key, let plain = try? BLESecurity.open(data, key: key, direction: .ack),
            let ack = try? JSONDecoder().decode(BLEAck.self, from: plain) {
-            return ack
+            if ack.isHello {
+                peerName = ack.mac
+                pairingMismatch = false
+                note("hello from \"\(ack.mac ?? "?")\" — pairing OK")
+                setStatus("Connected to \(macName)", connected: true, waiting: false)
+            } else {
+                resolveAck(ack.id, ack)
+            }
+            return
         }
-        if let ack = try? JSONDecoder().decode(BLEAck.self, from: data), !ack.ok { return ack }
-        return nil
+        if let ack = try? JSONDecoder().decode(BLEAck.self, from: data), !ack.ok {
+            resolveAck(ack.id, ack)
+            return
+        }
+        // Sealed with a different token: this profile isn't paired with that Mac.
+        pairingMismatch = true
+        note("ack/hello couldn't be opened (\(data.count) bytes) — pairing mismatch")
+        setStatus("Connected, but pairing doesn't match — scan the Mac's QR", connected: true, waiting: false)
     }
 
     // MARK: - Diagnostics
@@ -312,7 +284,6 @@ public final class BluetoothBridge: NSObject, ObservableObject {
         defaults.set(diagnostics, forKey: Self.diagnosticsKey)
     }
 
-    /// "CBErrorDomain 14: Peer removed pairing information" style detail.
     nonisolated static func describe(_ error: Error) -> String {
         let ns = error as NSError
         let domain = ns.domain == CBError.errorDomain ? "CBError"
@@ -323,127 +294,81 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     nonisolated static func short(_ id: UUID) -> String { String(id.uuidString.prefix(8)) }
 }
 
-extension BluetoothBridge: CBCentralManagerDelegate, CBPeripheralDelegate {
-    nonisolated public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+extension BluetoothBridge: CBPeripheralManagerDelegate {
+    nonisolated public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         MainActor.assumeIsolated {
-            note("central state \(central.state.rawValue) (authorization \(CBManager.authorization.rawValue))")
-            if central.state != .poweredOn { dropLink("Bluetooth unavailable") }
-            if !readyWaiters.isEmpty { startIfPossible() }
-        }
-    }
-
-    nonisolated public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
-                                           advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        let connectable = (advertisementData[CBAdvertisementDataIsConnectable] as? NSNumber)?.boolValue
-        MainActor.assumeIsolated {
-            guard stage == .scanning else { return }
-            central.stopScan()
-            note("found \(Self.short(peripheral.identifier)) \"\(advertisedName ?? peripheral.name ?? "?")\" RSSI \(RSSI) connectable \(connectable.map(String.init) ?? "?")")
-            peerName = advertisedName ?? peripheral.name
-            connect(peripheral)
-        }
-    }
-
-    nonisolated public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        MainActor.assumeIsolated {
-            note("connected \(Self.short(peripheral.identifier)), max write \(peripheral.maximumWriteValueLength(for: .withResponse))")
-            peripheral.delegate = self
-            discover(on: peripheral)
-        }
-    }
-
-    nonisolated public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral,
-                                           error: Error?) {
-        let detail = error.map(Self.describe) ?? "no error given"
-        MainActor.assumeIsolated {
-            note("didFailToConnect: \(detail)")
-            lastError = detail
-            dropLink("Couldn't connect")
-            if connectAttempts < 2, !readyWaiters.isEmpty {
-                stage = .connecting
-                timedOut()   // retries once with a fresh scan
+            note("peripheral state \(peripheral.state.rawValue) (authorization \(CBManager.authorization.rawValue))")
+            if peripheral.state == .poweredOn {
+                setStatus("Waiting for the Mac…", connected: false, waiting: true)
+                publish()
             } else {
-                finishReady("Couldn't connect to the Mac helper — \(detail)")
+                serviceAdded = false
+                subscriber = nil
+                failPending("Bluetooth unavailable")
+                setStatus(stateProblem() ?? "Bluetooth unavailable", connected: false, waiting: false)
             }
         }
     }
 
-    nonisolated public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral,
-                                           error: Error?) {
-        let detail = error.map(Self.describe)
-        MainActor.assumeIsolated {
-            note("disconnected \(Self.short(peripheral.identifier))\(detail.map { ": \($0)" } ?? "")")
-            if let detail { lastError = detail }
-            dropLink(detail.map { "Disconnected — \($0)" } ?? "Disconnected")
-        }
-    }
-
-    nonisolated public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        let detail = error.map(Self.describe)
-        MainActor.assumeIsolated {
-            guard let service = peripheral.services?.first(where: { $0.uuid == serviceUUID }) else {
-                note("service missing (\(peripheral.services?.count ?? 0) services)\(detail.map { ": \($0)" } ?? "")")
-                finishReady("Mac helper service missing\(detail.map { " — \($0)" } ?? "") — reopen WhisperBridge Bluetooth on the Mac")
-                return
-            }
-            peripheral.discoverCharacteristics([messageUUID, ackUUID], for: service)
-        }
-    }
-
-    nonisolated public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,
-                                       error: Error?) {
-        MainActor.assumeIsolated {
-            messageChar = service.characteristics?.first { $0.uuid == messageUUID }
-            ackChar = service.characteristics?.first { $0.uuid == ackUUID }
-            guard messageChar != nil, let ackChar else {
-                note("characteristics missing\(error.map { ": \(Self.describe($0))" } ?? "")")
-                finishReady("Mac helper characteristics missing — update WhisperBridge Bluetooth on the Mac")
-                return
-            }
-            stage = .subscribing
-            setStatus("Opening the link…", connected: false)
-            armTimeout(seconds: 15)
-            peripheral.setNotifyValue(true, for: ackChar)
-        }
-    }
-
-    nonisolated public func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic,
-                                       error: Error?) {
+    nonisolated public func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
         let detail = error.map(Self.describe)
         MainActor.assumeIsolated {
             if let detail {
-                note("subscribe failed: \(detail)")
-                lastError = detail
-                finishReady("Couldn't open the link — \(detail). If it mentions encryption, update WhisperBridge Bluetooth on the Mac.")
+                note("add service failed: \(detail)")
+                setStatus("Bluetooth setup failed — \(detail)", connected: false, waiting: false)
                 return
             }
-            note("link ready")
-            if peerName == nil { peerName = peripheral.name }
-            setStatus("Connected to \(macName)", connected: true)
-            finishReady(nil)
+            serviceAdded = true
+            note("service added")
+            advertise()
         }
     }
 
-    nonisolated public func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic,
-                                       error: Error?) {
+    nonisolated public func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
+        let detail = error.map(Self.describe)
         MainActor.assumeIsolated {
-            writeWaiter?.resume(returning: error)
-            writeWaiter = nil
+            if let detail {
+                note("advertising failed: \(detail)")
+                setStatus("Advertising failed — \(detail)", connected: false, waiting: false)
+            } else {
+                note("advertising (waiting for the Mac helper)")
+                if subscriber == nil { setStatus("Waiting for the Mac…", connected: false, waiting: true) }
+            }
         }
     }
 
-    nonisolated public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
-                                       error: Error?) {
-        let data = characteristic.value
-        let isAck = characteristic.uuid == CBUUID(string: BLEProtocol.ackCharacteristicUUID)
+    nonisolated public func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
+                                              didSubscribeTo characteristic: CBCharacteristic) {
         MainActor.assumeIsolated {
-            guard isAck, let data else { return }
-            guard let ack = decodeAck(data) else {
-                note("ack ignored: couldn't verify (\(data.count) bytes)")
-                return
-            }
-            resolveAck(ack.id, ack)
+            subscriber = central
+            note("Mac \(Self.short(central.identifier)) subscribed (max update \(central.maximumUpdateValueLength) bytes)")
+            setStatus("Connected to \(macName)", connected: true, waiting: false)
+            finishLinkWait(true)
         }
+    }
+
+    nonisolated public func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
+                                              didUnsubscribeFrom characteristic: CBCharacteristic) {
+        MainActor.assumeIsolated {
+            note("Mac \(Self.short(central.identifier)) unsubscribed / disconnected")
+            if subscriber?.identifier == central.identifier { subscriber = nil }
+            failPending("Mac disconnected")
+            setStatus("Waiting for the Mac…", connected: false, waiting: true)
+            advertise()
+        }
+    }
+
+    nonisolated public func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
+        MainActor.assumeIsolated { resumeReadyToSend(true) }
+    }
+
+    nonisolated public func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
+        let writes = requests.map { ($0.characteristic.uuid, $0.value) }
+        MainActor.assumeIsolated {
+            for (uuid, value) in writes where uuid == CBUUID(string: BLEProtocol.ackCharacteristicUUID) {
+                if let value { handleAckWrite(value) }
+            }
+        }
+        if let first = requests.first { peripheral.respond(to: first, withResult: .success) }
     }
 }

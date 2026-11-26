@@ -43,13 +43,21 @@ receiver on port 9877 answers, and the last message. The iPhone shows a blue
 ## On the plane
 
 Keep Bluetooth on (it is allowed in airplane mode). Open the helper on the Mac,
-open the app on the iPhone, dictate and send. The menu bar item shows
+open the app on the iPhone **and keep it on screen** (iOS only advertises for
+apps in the foreground), dictate and send. The menu bar item shows
 "iPhone connected" and the last result.
 
 ## How it works
 
-- Custom GATT service `6E1B0001-7A3C-4F5D-9B21-57A1B7E0B4C1`: a write
-  characteristic for message frames and a notify characteristic for acks.
+- **Roles:** the iPhone is the Bluetooth peripheral. While Whisper Bridge is
+  open on a Bluetooth profile it advertises service
+  `6E1B0001-7A3C-4F5D-9B21-57A1B7E0B4C1`. This helper is the central: it scans,
+  connects to every iPhone it finds, subscribes to the message characteristic
+  (frames arrive as notifications) and writes acks back. It reconnects by
+  itself. The reverse (iPhone connecting to the Mac) hung between
+  same-Apple-ID devices and never reached the Mac, so the roles were swapped.
+- Right after connecting, the helper sends a sealed hello with its name. The
+  iPhone shows "Connected to <Mac>", or warns at once if the pairing doesn't match.
 - **Security is at the app layer, not OS pairing.** An iPhone and a Mac on the
   same Apple ID already share Continuity keys and an LE link, and
   encryption-required characteristics there stall or never prompt. Instead each
@@ -77,4 +85,5 @@ open the app on the iPhone, dictate and send. The menu bar item shows
 - Speed: fine for dictation (a few KB per second); max 64 KB per message.
 - The iPhone connects to the first Mac it finds running the helper. If two
   Macs run it nearby, quit it on the one you don't want.
-- iOS can only keep the link while the app is open.
+- The iPhone app must be open on screen: iOS stops advertising the service to
+  Macs when the app is in the background.

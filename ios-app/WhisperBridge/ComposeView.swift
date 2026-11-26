@@ -57,8 +57,9 @@ struct ComposeView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .onAppear { if bluetooth { bluetoothLink.warmUp() } }
-        .onChange(of: active?.id) { if bluetooth { bluetoothLink.warmUp() } }
+        .onAppear { syncBluetooth() }
+        .onChange(of: active?.id) { syncBluetooth() }
+        .onChange(of: active?.transport) { syncBluetooth() }
         .alert("New Computer", isPresented: $showAdd) {
             TextField("Name (e.g. Mac Studio)", text: $addName)
             Button("Add") {
@@ -138,7 +139,7 @@ struct ComposeView: View {
     private var modePill: some View {
         let (icon, title, detail, color) = modeDescription
         return Button {
-            if bluetooth { bluetoothLink.warmUp() }
+            syncBluetooth()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: icon)
@@ -162,17 +163,29 @@ struct ComposeView: View {
         .animation(Motion.tap, value: bluetoothLink.phase)
     }
 
+    /// The iPhone advertises only while a Bluetooth profile is active, so the
+    /// Mac helper can find it; Wi-Fi profiles turn advertising off.
+    private func syncBluetooth() {
+        if let active, active.transport == .bluetooth {
+            bluetoothLink.warmUp(token: active.token)
+        } else {
+            bluetoothLink.stop()
+        }
+    }
+
     private var modeDescription: (String, String, String, Color) {
         guard let active else { return ("questionmark", "Not set", "", palette.textSecondary) }
         if active.transport == .bluetooth {
             let blue = Color(hex: "#2F7BFF")
             switch bluetoothLink.phase {
+            case .connected where bluetoothLink.pairingMismatch:
+                return ("exclamationmark.triangle.fill", "Bluetooth", "Pairing doesn't match — scan the Mac's QR", .orange)
             case .connected:
                 return ("antenna.radiowaves.left.and.right", "Bluetooth", "Connected to \(bluetoothLink.macName)", blue)
             case .searching:
-                return ("antenna.radiowaves.left.and.right", "Bluetooth", "Searching…", blue)
+                return ("antenna.radiowaves.left.and.right", "Bluetooth", "Waiting for the Mac…", blue)
             case .idle:
-                return ("antenna.radiowaves.left.and.right.slash", "Bluetooth", "Not connected — tap to retry", palette.textSecondary)
+                return ("antenna.radiowaves.left.and.right.slash", "Bluetooth", "\(bluetoothLink.status) — tap to retry", palette.textSecondary)
             }
         }
         return Pairing.isTailscale(active.host)

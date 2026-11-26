@@ -24,9 +24,14 @@ public enum BLEProtocol {
     public static let reassemblyTimeout: TimeInterval = 10
 
     public static let serviceUUID = "6E1B0001-7A3C-4F5D-9B21-57A1B7E0B4C1"
-    /// iPhone → Mac framed, sealed message chunks (write with response).
+    /// Roles: the iPhone is the peripheral (advertises this service while the app
+    /// is open); the Mac helper is the central that finds and connects to it.
+    /// (iPhone-as-central → Mac-as-peripheral connects hung between same-Apple-ID
+    /// devices, so the roles were swapped.)
+    ///
+    /// iPhone → Mac framed, sealed message chunks (notify; the Mac subscribes).
     public static let messageCharacteristicUUID = "6E1B0002-7A3C-4F5D-9B21-57A1B7E0B4C1"
-    /// Mac → iPhone acknowledgements (notify): sealed `BLEAck` JSON.
+    /// Mac → iPhone acknowledgements (write with response): sealed `BLEAck` JSON.
     public static let ackCharacteristicUUID = "6E1B0003-7A3C-4F5D-9B21-57A1B7E0B4C1"
 
     /// Text modes the receiver's `/send` accepts. Nothing else crosses Bluetooth.
@@ -80,12 +85,19 @@ public struct BLEAck: Codable, Equatable {
     public var id: UInt16
     public var ok: Bool
     public var message: String
+    /// Set only on the Mac's sealed hello right after it connects: its name.
+    /// Lets the iPhone show "Connected to <Mac>" and check the pairing early.
+    public var mac: String?
 
-    public init(id: UInt16, ok: Bool, message: String) {
+    public init(id: UInt16, ok: Bool, message: String, mac: String? = nil) {
         self.id = id
         self.ok = ok
         self.message = message
+        self.mac = mac
     }
+
+    public static func hello(mac: String) -> BLEAck { BLEAck(id: 0, ok: true, message: "hello", mac: mac) }
+    public var isHello: Bool { message == "hello" && mac != nil }
 }
 
 public enum BLEFraming {

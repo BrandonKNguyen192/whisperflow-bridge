@@ -84,14 +84,9 @@ struct SettingsView: View {
                 field("Port", text: $portText, placeholder: "9877", keyboard: .numberPad)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Sends text to the WhisperBridge Bluetooth app on your Mac. No Wi-Fi needed. Trackpad and air mouse stay on Wi-Fi.")
+                    Text("Sends text to the WhisperBridge Bluetooth app on your Mac. No Wi-Fi needed. Keep this app open: the Mac connects to the iPhone while it's on screen. Trackpad and air mouse stay on Wi-Fi.")
                     Text("Easiest: on the Mac, click the WhisperBridge Bluetooth menu → Pair iPhone…, then tap Scan here.")
                     Text("Status: \(bluetoothLink.status)")
-                    if token.trimmingCharacters(in: .whitespaces).isEmpty {
-                        Label("No token yet — tap Scan and point at the Mac's Pair iPhone… QR.",
-                              systemImage: "qrcode")
-                            .foregroundStyle(accent)
-                    }
                     DisclosureGroup("Bluetooth diagnostics") {
                         VStack(alignment: .leading, spacing: 8) {
                             ScrollView {
@@ -133,16 +128,33 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 10) {
-                // Scan always works (it is how a Bluetooth profile gets its token);
-                // it is the highlighted next step while the token is empty.
-                glassButton("Scan", icon: "qrcode.viewfinder",
-                            prominent: token.trimmingCharacters(in: .whitespaces).isEmpty) {
-                    showScan = true
+                // Scan always works (it is how a Bluetooth profile gets its token).
+                // While the token is empty it is a solid, unmistakable button.
+                if needsToken {
+                    Button { showScan = true } label: {
+                        Label("Scan QR", systemImage: "qrcode.viewfinder")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    glassButton("Scan", icon: "qrcode.viewfinder") { showScan = true }
                 }
                 glassButton(testing ? "Testing…" : "Test", icon: "bolt", spinner: testing) {
                     testConnection()
                 }
+                .disabled(needsToken)
+                .opacity(needsToken ? 0.45 : 1)
                 saveButton
+            }
+            if needsToken {
+                Text("Test needs the token — tap Scan QR and point at the Mac's Pair iPhone… code first.")
+                    .font(.footnote)
+                    .foregroundStyle(palette.textSecondary)
             }
 
             if !message.isEmpty {
@@ -207,6 +219,11 @@ struct SettingsView: View {
                 .padding(14)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
+    }
+
+    /// Bluetooth profiles can't do anything without the token from the QR.
+    private var needsToken: Bool {
+        transport == .bluetooth && token.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func saveConnection() {
@@ -308,7 +325,7 @@ struct SettingsView: View {
             messageIsError = false
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        BluetoothBridge.shared.warmUp()
+        BluetoothBridge.shared.warmUp(token: token)
     }
 
     private func syncFromProfile() {
