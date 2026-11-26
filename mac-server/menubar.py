@@ -21,6 +21,8 @@ Usage:
     python3 menubar.py --remove-app          # remove the menu-bar app
     python3 menubar.py --print-plist         # print the LaunchAgent plist (no side effects)
 """
+from __future__ import annotations
+
 
 import argparse
 import os

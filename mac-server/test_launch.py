@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for login-item upgrades."""
+from __future__ import annotations
+
 
 import os
 import plistlib

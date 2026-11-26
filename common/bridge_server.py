@@ -7,6 +7,8 @@ Zero dependencies — uses only Python standard library.
 Usage:
     python3 server.py [--port 9877] [--clipboard-only]
 """
+from __future__ import annotations
+
 
 import argparse
 import json

@@ -15,6 +15,8 @@ Usage:
     python3 launch.py --uninstall-login          # remove the login item
     python3 launch.py --print-plist              # print the LaunchAgent plist
 """
+from __future__ import annotations
+
 
 import argparse
 import os

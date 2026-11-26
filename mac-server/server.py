@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Compatibility entry point for the shared Whisper Bridge server."""
+from __future__ import annotations
+
 
 import os
 import sys

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Shared runtime used by the Ubuntu and Windows receiver launchers."""
+from __future__ import annotations
+
 
 import signal
 import threading

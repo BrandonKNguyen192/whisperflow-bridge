@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for the Whisper Bridge HTTP protocol."""
+from __future__ import annotations
+
 
 import http.client
 import json

@@ -6,6 +6,8 @@ dictation feedback. Sits in the bottom-right corner of the screen.
 
 No Accessibility permissions needed. Just run it.
 """
+from __future__ import annotations
+
 
 import json
 import os
