@@ -83,7 +83,8 @@ apps in the foreground), dictate and send. The menu bar item shows
 
 - Range: a few metres, same as any Bluetooth LE link.
 - Speed: fine for dictation (a few KB per second); max 64 KB per message.
-- The iPhone connects to the first Mac it finds running the helper. If two
-  Macs run it nearby, quit it on the one you don't want.
+- Any Mac running the helper nearby connects to the iPhone; only the Mac whose
+  token matches the iPhone's QR can open messages (others get "pairing doesn't
+  match"). Quit the helper on Macs you don't want to use.
 - The iPhone app must be open on screen: iOS stops advertising the service to
   Macs when the app is in the background.
