@@ -35,7 +35,7 @@ public enum BLEProtocol {
     public static let ackCharacteristicUUID = "6E1B0003-7A3C-4F5D-9B21-57A1B7E0B4C1"
 
     /// Text modes the receiver's `/send` accepts. Nothing else crosses Bluetooth.
-    public static let allowedModes: Set<String> = ["type", "clipboard", "append", "enter"]
+    public static let allowedModes: Set<String> = ["type", "clipboard", "append", "enter", "tab", "backspace"]
 }
 
 /// What the iPhone sends. `kind` is "send" (deliver text) or "probe" (check the

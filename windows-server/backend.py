@@ -48,6 +48,8 @@ MOUSEEVENTF_MIDDLEUP = 0x0040
 MOUSEEVENTF_WHEEL = 0x0800
 
 VK_RETURN = 0x0D
+VK_TAB = 0x09
+VK_BACK = 0x08
 VK_CONTROL = 0x11
 VK_SHIFT = 0x10
 VK_MENU = 0x12
@@ -179,10 +181,13 @@ def _press_ctrl_v() -> None:
     _send_key(vk=VK_CONTROL, flags=KEYEVENTF_KEYUP)
 
 
+_KEY_MODES = {"enter": VK_RETURN, "tab": VK_TAB, "backspace": VK_BACK}
+
+
 def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
     try:
-        if mode == "enter":
-            _press_vk(VK_RETURN)
+        if mode in _KEY_MODES:
+            _press_vk(_KEY_MODES[mode])
             return True
         if mode == "append":
             existing = _clipboard_read()

@@ -34,6 +34,21 @@ class UbuntuBackendTests(unittest.TestCase):
             check=True,
         )
 
+    @mock.patch.object(backend.shutil, "which", side_effect=lambda name: f"/usr/bin/{name}")
+    @mock.patch.object(backend.subprocess, "run")
+    def test_wayland_tab_and_backspace_use_ydotool(self, run, _which):
+        with mock.patch.dict(backend.os.environ, {"XDG_SESSION_TYPE": "wayland"}, clear=True):
+            self.assertTrue(backend.type_text("", "tab"))
+            self.assertTrue(backend.type_text("", "backspace"))
+        self.assertEqual(["ydotool", "key", "15:1", "15:0"], run.call_args_list[0].args[0])
+        self.assertEqual(["ydotool", "key", "14:1", "14:0"], run.call_args_list[1].args[0])
+
+    @mock.patch.object(backend.subprocess, "run")
+    def test_x11_backspace_uses_xdotool(self, run):
+        with mock.patch.dict(backend.os.environ, {"XDG_SESSION_TYPE": "x11", "DISPLAY": ":0"}, clear=True):
+            self.assertTrue(backend.type_text("", "backspace"))
+        run.assert_called_once_with(["xdotool", "key", "--clearmodifiers", "BackSpace"], check=True)
+
     @mock.patch.object(backend.shutil, "which", return_value=None)
     def test_missing_wayland_tools_are_reported(self, _which):
         with mock.patch.dict(backend.os.environ, {"XDG_SESSION_TYPE": "wayland"}, clear=True):

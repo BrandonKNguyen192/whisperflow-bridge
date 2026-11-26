@@ -83,6 +83,9 @@ public struct ReceiverForwarder {
                                 : BLEAck(id: id, ok: false, message: "HTTP \(status)")
         }
         if (200...299).contains(status), json?["ok"] as? Bool == true {
+            if let mode = json?["mode"] as? String, ["enter", "tab", "backspace"].contains(mode) {
+                return BLEAck(id: id, ok: true, message: "Pressed \(mode.capitalized) over Bluetooth")
+            }
             let chars = json?["chars"] as? Int ?? 0
             return BLEAck(id: id, ok: true, message: "Sent \(chars) chars over Bluetooth")
         }

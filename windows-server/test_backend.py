@@ -28,6 +28,12 @@ class WindowsBackendTests(unittest.TestCase):
             self.assertEqual(backend.VK_RETURN, calls[0].kwargs["vk"])
             self.assertEqual(backend.KEYEVENTF_KEYUP, calls[1].kwargs.get("flags", 0))
 
+    def test_tab_and_backspace_press_keys(self):
+        for mode, vk in (("tab", backend.VK_TAB), ("backspace", backend.VK_BACK)):
+            with mock.patch.object(backend, "_send_key") as send_key:
+                self.assertTrue(backend.type_text("", mode))
+                self.assertEqual(vk, send_key.call_args_list[0].kwargs["vk"])
+
     def test_clipboard_mode_writes_clipboard(self):
         with mock.patch.object(backend, "_clipboard_write") as write:
             self.assertTrue(backend.type_text("hello", "clipboard"))

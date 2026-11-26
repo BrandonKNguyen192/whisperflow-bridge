@@ -189,12 +189,22 @@ except Exception:
     QR_LIB_JS = ""
 
 
+# Modes that press one key and send no text, with the System Events command for each.
+KEY_MODES = {
+    "enter": "keystroke return",
+    "tab": "keystroke tab",
+    "backspace": "key code 51",  # Delete (backspace)
+}
+SEND_MODES = ("type", "clipboard", "append", *KEY_MODES)
+
+
 def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
     """Inject text into the active application.
 
     mode="type"      → copy to clipboard, then simulate ⌘V
     mode="clipboard" → copy to clipboard only
     mode="append"    → append to clipboard (with newline separator)
+    mode="enter" / "tab" / "backspace" → press that single key, no text
 
     enter_after      → simulate Return/Enter after paste (for "type" mode)
     """
@@ -207,14 +217,11 @@ def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
             subprocess.run(["pbcopy"], input=combined.encode(), check=True)
             return True
 
-        # Mode 'enter': just fire a Return keystroke, no text
-        if mode == "enter":
+        # Key-only modes: fire one keystroke, no text
+        if mode in KEY_MODES:
             time.sleep(0.05)
             subprocess.run(
-                [
-                    "osascript", "-e",
-                    'tell application "System Events" to keystroke return',
-                ],
+                ["osascript", "-e", f'tell application "System Events" to {KEY_MODES[mode]}'],
                 check=True,
             )
             return True
@@ -995,11 +1002,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not isinstance(mode, str):
             self._json({"ok": False, "error": "mode must be a string"}, 400)
             return
-        if mode not in ("type", "clipboard", "append", "enter"):
+        if mode not in SEND_MODES:
             self._json({"ok": False, "error": "unsupported mode"}, 400)
             return
 
-        if mode != "enter" and not text:
+        if mode not in KEY_MODES and not text:
             self._json({"ok": False, "error": "empty text"}, 400)
             return
 
@@ -1009,7 +1016,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
         source = source[:80]
         ts = time.strftime("%H:%M:%S")
-        preview = text[:80] + ("…" if len(text) > 80 else "") if text else "(enter)"
+        preview = text[:80] + ("…" if len(text) > 80 else "") if text else f"({mode})"
         if LOG_CONTENT:
             print(f"  ← [{ts}] ({source}/{mode}) {preview}")
         else:
@@ -1021,10 +1028,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
         ok = type_text(text, mode, enter_after=enter_after)
         if ok:
-            notify("Whisper Bridge", f"Received {len(text)} chars" if text else "Return key pressed")
+            notify("Whisper Bridge", f"Received {len(text)} chars" if text else f"{mode.capitalize()} key pressed")
             chime()
             STATUS["count"] += 1
-            STATUS["last_preview"] = text[:60] + ("…" if len(text) > 60 else "") if text else "(enter)"
+            STATUS["last_preview"] = text[:60] + ("…" if len(text) > 60 else "") if text else f"({mode})"
             STATUS["last_source"] = source
             STATUS["last_mode"] = mode
             STATUS["last_ts"] = ts

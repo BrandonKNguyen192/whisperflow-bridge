@@ -57,6 +57,20 @@ class BridgeProtocolTests(unittest.TestCase):
         self.assertEqual("enter", body["mode"])
         type_text.assert_called_once_with("", "enter", enter_after=False)
 
+    @mock.patch.object(server, "chime")
+    @mock.patch.object(server, "notify")
+    @mock.patch.object(server, "type_text", return_value=True)
+    def test_tab_and_backspace_accept_empty_text(self, type_text, _notify, _chime):
+        for mode in ("tab", "backspace"):
+            status, body = self.post({"text": "", "mode": mode, "source": "test"})
+            self.assertEqual(200, status)
+            self.assertEqual(mode, body["mode"])
+            type_text.assert_called_with("", mode, enter_after=False)
+
+    def test_key_modes_map_to_system_events(self):
+        self.assertEqual("keystroke tab", server.KEY_MODES["tab"])
+        self.assertEqual("key code 51", server.KEY_MODES["backspace"])
+
     @mock.patch.object(server, "type_text")
     def test_type_rejects_empty_text(self, type_text):
         status, body = self.post({"text": "", "mode": "type"})

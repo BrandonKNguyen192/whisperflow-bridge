@@ -180,7 +180,7 @@ curl -H "Authorization: Bearer $(cat ~/.config/whisperbridge/token)" -H 'Content
 ## Bluetooth Mode (iPhone, text only — no Wi‑Fi needed)
 
 For planes and other places with no shared network. The iPhone sends text to
-the Mac over Bluetooth LE. **Text only:** type, clipboard, append and Enter.
+the Mac over Bluetooth LE. **Text only:** type, clipboard, append, and the Enter, Tab and Backspace keys.
 The trackpad and air mouse are hidden for Bluetooth profiles and refused by the
 Mac helper.
 

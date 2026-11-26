@@ -15,6 +15,10 @@ struct ComposeView: View {
     @State private var showAdd = false
     @State private var addName = ""
     @State private var sentPulse = false
+    /// Two columns (compose | trackpad) when the window is wide: iPhone Duo
+    /// unfolded in landscape, iPad, Stage Manager. Read from this view's own
+    /// size, so it follows every fold, rotation and window resize.
+    @State private var wideLayout = false
     @FocusState private var textFocused: Bool
     @Namespace private var chipGlass
     @ObservedObject private var bluetoothLink = BluetoothBridge.shared
@@ -29,33 +33,32 @@ struct ComposeView: View {
         ZStack {
             AmbientBackground(palette: palette, accent: accent)
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    if configured { modePill }
-                    profileChips
-                    composeCard
-                    if bluetooth {
-                        // Bluetooth carries text only: no trackpad or air mouse.
-                        Label("Bluetooth mode sends text only. Trackpad and air mouse need Wi-Fi or Tailscale.",
-                              systemImage: "dot.radiowaves.left.and.right")
-                            .font(.footnote)
-                            .foregroundStyle(palette.textSecondary)
-                            .padding(16)
-                            .glassCard()
-                    } else {
-                        TrackpadView { text, isError in
-                            withAnimation(Motion.tap) {
-                                message = text
-                                messageIsError = isError
-                            }
-                        }
+                // AnyLayout keeps the same view identity when the layout flips,
+                // so the draft text and trackpad state survive a fold or resize.
+                let layout = wideLayout
+                    ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
+                    : AnyLayout(VStackLayout(alignment: .leading, spacing: 20))
+                layout {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header
+                        if configured { modePill }
+                        profileChips
+                        composeCard
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    controlPanel
+                        .frame(maxWidth: .infinity)
                 }
-                .padding(24)
-                .frame(maxWidth: 880)
+                .padding(wideLayout ? 28 : 24)
+                .frame(maxWidth: wideLayout ? 1200 : 880)
                 .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.size.width >= 720
+            } action: { isWide in
+                wideLayout = isWide
+            }
         }
         .onAppear { syncBluetooth() }
         .onChange(of: active?.id) { syncBluetooth() }
@@ -78,6 +81,27 @@ struct ComposeView: View {
     }
 
     // MARK: - Sections
+
+    @ViewBuilder
+    private var controlPanel: some View {
+        if bluetooth {
+            // Bluetooth carries text only: no trackpad or air mouse.
+            Label("Bluetooth mode sends text only. Trackpad and air mouse need Wi-Fi or Tailscale.",
+                  systemImage: "dot.radiowaves.left.and.right")
+                .font(.footnote)
+                .foregroundStyle(palette.textSecondary)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassCard()
+        } else {
+            TrackpadView { text, isError in
+                withAnimation(Motion.tap) {
+                    message = text
+                    messageIsError = isError
+                }
+            }
+        }
+    }
 
     private var header: some View {
         HStack(spacing: 14) {
@@ -266,12 +290,17 @@ struct ComposeView: View {
 
             HStack(spacing: 12) {
                 sendButton
-                actionButton("Enter", icon: "return") {
-                    send(mode: "enter")
-                }
+                    .layoutPriority(1)
                 actionButton("Copy", icon: "doc.on.clipboard") {
                     send(mode: "clipboard")
                 }
+            }
+
+            // Single keys pressed on the computer; they work with an empty draft.
+            // Narrow windows (iPhone, Duo folded) stack the label under the icon.
+            ViewThatFits(in: .horizontal) {
+                keyRow(stacked: false)
+                keyRow(stacked: true)
             }
 
             if !message.isEmpty {
@@ -317,17 +346,45 @@ struct ComposeView: View {
         .sensoryFeedback(.success, trigger: sentPulse)
     }
 
+    private func keyRow(stacked: Bool) -> some View {
+        HStack(spacing: 12) {
+            actionButton("Tab", icon: "arrow.right.to.line", stacked: stacked) {
+                send(mode: "tab")
+            }
+            actionButton("Backspace", icon: "delete.left", stacked: stacked) {
+                send(mode: "backspace")
+            }
+            actionButton("Enter", icon: "return", stacked: stacked) {
+                send(mode: "enter")
+            }
+        }
+    }
+
     private func actionButton(
         _ title: String,
         icon: String,
+        stacked: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                Text(title)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+            Group {
+                if stacked {
+                    VStack(spacing: 4) {
+                        Image(systemName: icon)
+                        Text(title)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .padding(.vertical, -3)
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: icon)
+                        Text(title)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
             }
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)
@@ -338,9 +395,12 @@ struct ComposeView: View {
         .buttonBorderShape(.roundedRectangle(radius: 16))
         .tint(palette.textPrimary)
         .disabled(sending)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Actions
+
+    private static let keyModes: Set<String> = ["enter", "tab", "backspace"]
 
     private func send(mode: String) {
         guard let active, active.isConfigured else {
@@ -350,7 +410,8 @@ struct ComposeView: View {
             }
             return
         }
-        if mode != "enter" && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let isKey = Self.keyModes.contains(mode)
+        if !isKey && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             withAnimation(Motion.tap) {
                 message = "Nothing to send"
                 messageIsError = true
@@ -358,7 +419,7 @@ struct ComposeView: View {
             return
         }
         sending = true
-        let payload = mode == "enter" ? "" : text
+        let payload = isKey ? "" : text
         Task {
             let result = active.transport == .bluetooth
                 ? await BluetoothBridge.shared.send(

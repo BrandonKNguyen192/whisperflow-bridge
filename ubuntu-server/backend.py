@@ -54,25 +54,30 @@ def _clipboard_read() -> str:
     return subprocess.run(command, capture_output=True, text=True, check=True).stdout
 
 
+_KEYSYMS = {"enter": "Return", "tab": "Tab", "backspace": "BackSpace"}
+
+
 def _send_shortcut(shortcut: str) -> None:
     if _wayland() and _has("ydotool"):
         keys = {
             "paste": ["29:1", "47:1", "47:0", "29:0"],
             "enter": ["28:1", "28:0"],
+            "tab": ["15:1", "15:0"],
+            "backspace": ["14:1", "14:0"],
         }
         subprocess.run(["ydotool", "key", *keys[shortcut]], check=True)
     elif _wayland() and _has("wtype"):
-        command = ["wtype", "-M", "ctrl", "v", "-m", "ctrl"] if shortcut == "paste" else ["wtype", "-k", "Return"]
+        command = ["wtype", "-M", "ctrl", "v", "-m", "ctrl"] if shortcut == "paste" else ["wtype", "-k", _KEYSYMS[shortcut]]
         subprocess.run(command, check=True)
     else:
-        key = "ctrl+v" if shortcut == "paste" else "Return"
+        key = "ctrl+v" if shortcut == "paste" else _KEYSYMS[shortcut]
         subprocess.run(["xdotool", "key", "--clearmodifiers", key], check=True)
 
 
 def type_text(text: str, mode: str = "type", enter_after: bool = False) -> bool:
     try:
-        if mode == "enter":
-            _send_shortcut("enter")
+        if mode in _KEYSYMS:
+            _send_shortcut(mode)
             return True
         if mode == "append":
             existing = _clipboard_read()

@@ -59,6 +59,9 @@ public struct BridgeClient {
 
     public static let live = BridgeClient()
 
+    /// Modes that press one key on the computer and send no text.
+    public static let keyNames: [String: String] = ["enter": "Enter", "tab": "Tab", "backspace": "Backspace"]
+
     // MARK: - Text
 
     public func sendText(
@@ -88,13 +91,16 @@ public struct BridgeClient {
         if (200...299).contains(status) {
             if let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
                json["ok"] as? Bool == true {
+                if let key = Self.keyNames[mode] {
+                    return Result(ok: true, message: "Pressed \(key)")
+                }
                 let chars = json["chars"] as? Int ?? text.count
                 return Result(ok: true, message: "Sent \(chars) chars")
             }
             return Result(ok: false, message: "Server error")
         }
         let detail = jsonDetail(response.data)
-        if mode == "enter" && status == 400 {
+        if Self.keyNames[mode] != nil && status == 400 {
             return Result(ok: false, message: "Server needs an update or restart")
         }
         if !detail.isEmpty {
