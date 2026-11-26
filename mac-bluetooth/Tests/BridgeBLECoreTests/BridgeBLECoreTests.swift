@@ -63,4 +63,24 @@ final class BridgeBLECoreTests: XCTestCase {
                                         body: Data(#"{"ok":false,"error":"source must be a string"}"#.utf8), error: nil)
         XCTAssertEqual(bad.message, "HTTP 400: source must be a string")
     }
+
+    func testBluetoothPairingLink() {
+        let link = PairingLink.bluetooth(token: "a+b/c=d&e", macName: "Brandon’s MacBook Air", port: 9877)
+        XCTAssertTrue(link.hasPrefix("whisperbridge://pair?transport=bluetooth&port=9877"))
+        let items = URLComponents(string: link)!.queryItems!
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+        XCTAssertEqual(value("transport"), "bluetooth")
+        XCTAssertEqual(value("token"), "a+b/c=d&e")
+        XCTAssertEqual(value("name"), "Brandon’s MacBook Air")
+        XCTAssertNil(value("host"))
+        XCTAssertFalse(PairingLink.bluetooth(token: "", macName: "", port: 9877).contains("token="))
+    }
+
+    func testReadTokenTrimsAndToleratesMissingFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("wb-token-\(UUID().uuidString)")
+        try "  secret-token\n".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertEqual(PairingLink.readToken(path: url.path), "secret-token")
+        XCTAssertEqual(PairingLink.readToken(path: url.path + "-missing"), "")
+    }
 }

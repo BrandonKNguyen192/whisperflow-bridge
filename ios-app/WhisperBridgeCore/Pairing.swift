@@ -7,12 +7,16 @@ public enum Pairing {
         public let port: Int
         public let token: String
         public let name: String
+        /// `transport=bluetooth` links come from the Mac's WhisperBridge Bluetooth
+        /// helper; links without it (the receiver's QR) stay network profiles.
+        public let transport: Transport
 
-        public init(host: String, port: Int, token: String, name: String = "") {
+        public init(host: String, port: Int, token: String, name: String = "", transport: Transport = .network) {
             self.host = host
             self.port = port
             self.token = token
             self.name = name
+            self.transport = transport
         }
     }
 
@@ -46,6 +50,16 @@ public enum Pairing {
             }
             switch scheme {
             case "whisperbridge":
+                if item("transport")?.lowercased() == "bluetooth" {
+                    // Bluetooth needs no host; it finds the Mac by its service UUID.
+                    return Parsed(
+                        host: item("host")?.trimmingCharacters(in: .whitespaces) ?? "",
+                        port: item("port").flatMap(Int.init) ?? 9877,
+                        token: item("token") ?? "",
+                        name: item("name") ?? "",
+                        transport: .bluetooth
+                    )
+                }
                 guard let host = item("host")?.trimmingCharacters(in: .whitespaces),
                       !host.isEmpty else { return nil }
                 return Parsed(

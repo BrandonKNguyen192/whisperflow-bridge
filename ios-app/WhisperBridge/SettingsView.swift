@@ -58,10 +58,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showScan) {
                 ScanView { parsed in
                     showScan = false
-                    host = parsed.host
-                    portText = String(parsed.port)
-                    token = parsed.token
-                    saveConnection()
+                    apply(parsed)
                 }
             }
             .sheet(isPresented: $showColorPicker) {
@@ -88,8 +85,13 @@ struct SettingsView: View {
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sends text to the WhisperBridge Bluetooth app on your Mac. No Wi-Fi needed. Trackpad and air mouse stay on Wi-Fi.")
-                    Text("Scan the pairing QR once (on any network) to fill in the token.")
+                    Text("Easiest: on the Mac, click the WhisperBridge Bluetooth menu → Pair iPhone…, then tap Scan here.")
                     Text("Status: \(bluetoothLink.status)")
+                    if token.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Label("No token yet — tap Scan and point at the Mac's Pair iPhone… QR.",
+                              systemImage: "qrcode")
+                            .foregroundStyle(accent)
+                    }
                 }
                 .font(.footnote)
                 .foregroundStyle(palette.textSecondary)
@@ -108,7 +110,10 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 10) {
-                glassButton("Scan", icon: "qrcode.viewfinder") {
+                // Scan always works (it is how a Bluetooth profile gets its token);
+                // it is the highlighted next step while the token is empty.
+                glassButton("Scan", icon: "qrcode.viewfinder",
+                            prominent: token.trimmingCharacters(in: .whitespaces).isEmpty) {
                     showScan = true
                 }
                 glassButton(testing ? "Testing…" : "Test", icon: "bolt", spinner: testing) {
@@ -257,10 +262,30 @@ struct SettingsView: View {
             }
             return
         }
-        host = parsed.host
-        portText = String(parsed.port)
-        token = parsed.token
-        saveConnection()
+        apply(parsed)
+    }
+
+    /// Bluetooth links (from the Mac helper's "Pair iPhone…") create or refresh
+    /// their own "<Mac> · Bluetooth" profile and select it. Other links fill
+    /// the current profile, as before.
+    private func apply(_ parsed: Pairing.Parsed) {
+        guard parsed.transport == .bluetooth else {
+            host = parsed.host
+            portText = String(parsed.port)
+            token = parsed.token
+            saveConnection()
+            return
+        }
+        withAnimation(Motion.pop) {
+            profiles.applyBluetoothPairing(parsed)
+        }
+        syncFromProfile()
+        withAnimation(Motion.tap) {
+            message = "Paired “\(profiles.active?.name ?? "Mac")” — Bluetooth (text only). Tap Test."
+            messageIsError = false
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        BluetoothBridge.shared.warmUp()
     }
 
     private func syncFromProfile() {
@@ -449,6 +474,7 @@ struct SettingsView: View {
         _ title: String,
         icon: String,
         spinner: Bool = false,
+        prominent: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -468,8 +494,20 @@ struct SettingsView: View {
             .padding(.vertical, 13)
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.glass)
+        .buttonStyle(GlassChoiceStyle(prominent: prominent))
         .buttonBorderShape(.roundedRectangle(radius: 14))
         .tint(accent)
+    }
+}
+
+/// `.glass` and `.glassProminent` are different types; this picks one at runtime.
+private struct GlassChoiceStyle: PrimitiveButtonStyle {
+    let prominent: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        if prominent {
+            Button(configuration).buttonStyle(.glassProminent)
+        } else {
+            Button(configuration).buttonStyle(.glass)
+        }
     }
 }

@@ -14,6 +14,17 @@ public final class BluetoothBridge: NSObject, ObservableObject {
 
     @Published public private(set) var status = "Not connected"
     @Published public private(set) var connected = false
+    /// Coarse link state for the always-visible mode pill.
+    public enum Phase: Equatable { case idle, searching, connected }
+    @Published public private(set) var phase: Phase = .idle
+    /// Name the Mac helper advertises (e.g. "WhisperBridge Brandon's Air").
+    @Published public private(set) var peerName: String?
+
+    /// Display name of the connected Mac, without the helper's prefix.
+    public var macName: String {
+        let raw = peerName ?? "Mac"
+        return raw.hasPrefix("WhisperBridge ") ? String(raw.dropFirst("WhisperBridge ".count)) : raw
+    }
 
     private var central: CBCentralManager?
     private var peripheral: CBPeripheral?
@@ -26,6 +37,9 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     private var ackWaiters: [UInt16: CheckedContinuation<BLEAck?, Never>] = [:]
     private var busy = false
     private var readyGeneration = 0
+    /// How far the current attempt got, for an honest timeout message.
+    private enum Stage { case scanning, connecting, discovering, pairing }
+    private var stage: Stage = .scanning
 
     private let serviceUUID = CBUUID(string: BLEProtocol.serviceUUID)
     private let messageUUID = CBUUID(string: BLEProtocol.messageCharacteristicUUID)
@@ -44,6 +58,13 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     public func probe(token: String) async -> BridgeClient.Result {
         await perform(BLETextMessage(kind: "probe", text: "", mode: "type", token: token),
                       success: { _ in "Connected over Bluetooth" })
+    }
+
+    /// Starts looking for the Mac helper so the mode pill shows a live state
+    /// before the first send. Silent: failures just leave it "Not connected".
+    public func warmUp() {
+        guard !busy, !connected, readyWaiters.isEmpty else { return }
+        Task { _ = await ensureReady() }
     }
 
     // MARK: - Flow
@@ -105,16 +126,41 @@ public final class BluetoothBridge: NSObject, ObservableObject {
         let result: String? = await withCheckedContinuation { cont in
             readyWaiters.append(cont)
             guard readyWaiters.count == 1 else { return }
-            readyGeneration += 1
-            let generation = readyGeneration
+            stage = .scanning
+            armTimeout(seconds: 15)
             startIfPossible()
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(12))
-                guard let self, self.readyGeneration == generation else { return }
-                self.finishReady("Mac helper not found — open WhisperBridge Bluetooth on the Mac and keep Bluetooth on")
-            }
         }
         return result
+    }
+
+    /// (Re)starts the attempt's deadline. Pairing gets longer: the user has to
+    /// accept the system prompt on both the iPhone and the Mac.
+    private func armTimeout(seconds: Double) {
+        readyGeneration += 1
+        let generation = readyGeneration
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, self.readyGeneration == generation, !self.readyWaiters.isEmpty else { return }
+            self.timedOut()
+        }
+    }
+
+    private func timedOut() {
+        let message: String
+        switch stage {
+        case .scanning:
+            message = "Mac helper not found — open WhisperBridge Bluetooth on the Mac (menu bar) and keep Bluetooth on"
+        case .connecting:
+            message = "Found the Mac but couldn't connect — move closer and tap Test again"
+        case .discovering:
+            message = "Connected, but the helper didn't answer — quit and reopen WhisperBridge Bluetooth on the Mac"
+        case .pairing:
+            message = "Pairing didn't finish — accept the Bluetooth pairing prompt on the Mac and the iPhone, then tap Test"
+        }
+        if let peripheral, peripheral.state != .connected || messageChar == nil {
+            central?.cancelPeripheralConnection(peripheral)   // start clean next time
+        }
+        finishReady(message)
     }
 
     private func startIfPossible() {
@@ -122,8 +168,12 @@ public final class BluetoothBridge: NSObject, ObservableObject {
         switch central.state {
         case .poweredOn:
             if let peripheral, peripheral.state == .connected {
+                stage = .discovering
+                setStatus("Finding the helper…", connected: false)
                 peripheral.discoverServices([serviceUUID])
             } else if let known = central.retrieveConnectedPeripherals(withServices: [serviceUUID]).first {
+                // Already linked at the system level (e.g. paired earlier): such
+                // peripherals don't show up in scans, so reuse the link.
                 connect(known)
             } else {
                 setStatus("Searching…", connected: false)
@@ -141,8 +191,12 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     }
 
     private func connect(_ p: CBPeripheral) {
+        if let old = peripheral, old.identifier != p.identifier, old.state != .disconnected {
+            central?.cancelPeripheralConnection(old)
+        }
         peripheral = p
         p.delegate = self
+        stage = .connecting
         setStatus("Connecting…", connected: false)
         central?.connect(p)
     }
@@ -150,9 +204,12 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     private func finishReady(_ problem: String?) {
         guard !readyWaiters.isEmpty else { return }
         readyGeneration += 1
-        if problem != nil { central?.stopScan() }
         let waiters = readyWaiters
         readyWaiters.removeAll()
+        if problem != nil {
+            central?.stopScan()
+            if !connected { setStatus("Not connected", connected: false) }
+        }
         waiters.forEach { $0.resume(returning: problem) }
     }
 
@@ -163,6 +220,7 @@ public final class BluetoothBridge: NSObject, ObservableObject {
     private func setStatus(_ text: String, connected: Bool) {
         status = text
         self.connected = connected
+        phase = connected ? .connected : (readyWaiters.isEmpty ? .idle : .searching)
     }
 
     private func dropLink(_ reason: String) {
@@ -186,8 +244,10 @@ extension BluetoothBridge: CBCentralManagerDelegate, CBPeripheralDelegate {
 
     nonisolated public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                                            advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         MainActor.assumeIsolated {
             central.stopScan()
+            peerName = advertisedName ?? peripheral.name
             connect(peripheral)
         }
     }
@@ -195,6 +255,8 @@ extension BluetoothBridge: CBCentralManagerDelegate, CBPeripheralDelegate {
     nonisolated public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         MainActor.assumeIsolated {
             peripheral.delegate = self
+            stage = .discovering
+            setStatus("Finding the helper…", connected: false)
             peripheral.discoverServices([serviceUUID])
         }
     }
@@ -232,6 +294,9 @@ extension BluetoothBridge: CBCentralManagerDelegate, CBPeripheralDelegate {
                 return
             }
             // Subscribing to the encrypted ack characteristic triggers pairing if needed.
+            stage = .pairing
+            setStatus("Pairing — accept the prompt on the Mac and iPhone…", connected: false)
+            armTimeout(seconds: 60)
             peripheral.setNotifyValue(true, for: ackChar)
         }
     }
@@ -243,7 +308,8 @@ extension BluetoothBridge: CBCentralManagerDelegate, CBPeripheralDelegate {
                 finishReady("Bluetooth pairing failed: \(error.localizedDescription)")
                 return
             }
-            setStatus("Connected to \(peripheral.name ?? "Mac")", connected: true)
+            if peerName == nil { peerName = peripheral.name }
+            setStatus("Connected to \(macName)", connected: true)
             finishReady(nil)
         }
     }

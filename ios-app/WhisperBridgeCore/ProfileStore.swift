@@ -103,6 +103,34 @@ public final class ProfileStore: ObservableObject {
         setActive(profiles.count - 1)
     }
 
+    /// Applies a Bluetooth pairing link: creates (or refreshes) a profile named
+    /// "<Mac> · Bluetooth" with Transport = Bluetooth and selects it.
+    /// Returns the profile's index.
+    @discardableResult
+    public func applyBluetoothPairing(_ parsed: Pairing.Parsed) -> Int {
+        let name = Self.bluetoothProfileName(for: parsed.name)
+        if let index = profiles.firstIndex(where: { $0.transport == .bluetooth && $0.name == name }) {
+            let existing = profiles[index]
+            saveConnection(index: index, host: existing.host, port: parsed.port,
+                           token: parsed.token, transport: .bluetooth)
+            setActive(index)
+            return index
+        }
+        let profile = Profile(name: name, port: parsed.port, token: parsed.token, transport: .bluetooth)
+        updateKeychainToken(parsed.token, for: profile.id)
+        profiles.append(profile)
+        persist()
+        setActive(profiles.count - 1)
+        return profiles.count - 1
+    }
+
+    public static func bluetoothProfileName(for macName: String) -> String {
+        let cleaned = macName
+            .filter { $0.isLetter || $0.isNumber || " -_.'’".contains($0) }
+            .trimmingCharacters(in: .whitespaces)
+        return "\(cleaned.isEmpty ? "Mac" : String(cleaned.prefix(24))) · Bluetooth"
+    }
+
     public func remove(at index: Int) {
         guard profiles.indices.contains(index), profiles.count > 1 else { return }
         deleteKeychainToken(for: profiles[index].id)

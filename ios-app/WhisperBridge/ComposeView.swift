@@ -17,6 +17,7 @@ struct ComposeView: View {
     @State private var sentPulse = false
     @FocusState private var textFocused: Bool
     @Namespace private var chipGlass
+    @ObservedObject private var bluetoothLink = BluetoothBridge.shared
 
     private var palette: AppPalette { AppPalette.palette(for: theme.mode) }
     private var accent: Color { Color(hex: theme.accentHex) }
@@ -30,6 +31,7 @@ struct ComposeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
+                    if configured { modePill }
                     profileChips
                     composeCard
                     if bluetooth {
@@ -55,6 +57,8 @@ struct ComposeView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+        .onAppear { if bluetooth { bluetoothLink.warmUp() } }
+        .onChange(of: active?.id) { if bluetooth { bluetoothLink.warmUp() } }
         .alert("New Computer", isPresented: $showAdd) {
             TextField("Name (e.g. Mac Studio)", text: $addName)
             Button("Add") {
@@ -130,6 +134,52 @@ struct ComposeView: View {
             : "\(active.name) · \(active.host)"
     }
 
+    /// Always-visible answer to "how is this phone talking to the Mac right now?"
+    private var modePill: some View {
+        let (icon, title, detail, color) = modeDescription
+        return Button {
+            if bluetooth { bluetoothLink.warmUp() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .symbolEffect(.variableColor.iterative, options: .repeating,
+                                  isActive: bluetooth && bluetoothLink.phase == .searching)
+                Text(title).fontWeight(.bold)
+                Text("·").foregroundStyle(color.opacity(0.6))
+                Text(detail)
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+            }
+            .font(.subheadline)
+            .foregroundStyle(color)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.tint(color.opacity(0.22)), in: Capsule())
+        .accessibilityLabel("\(title), \(detail)")
+        .animation(Motion.tap, value: bluetoothLink.phase)
+    }
+
+    private var modeDescription: (String, String, String, Color) {
+        guard let active else { return ("questionmark", "Not set", "", palette.textSecondary) }
+        if active.transport == .bluetooth {
+            let blue = Color(hex: "#2F7BFF")
+            switch bluetoothLink.phase {
+            case .connected:
+                return ("antenna.radiowaves.left.and.right", "Bluetooth", "Connected to \(bluetoothLink.macName)", blue)
+            case .searching:
+                return ("antenna.radiowaves.left.and.right", "Bluetooth", "Searching…", blue)
+            case .idle:
+                return ("antenna.radiowaves.left.and.right.slash", "Bluetooth", "Not connected — tap to retry", palette.textSecondary)
+            }
+        }
+        return Pairing.isTailscale(active.host)
+            ? ("network", "Tailscale", active.host, accent)
+            : ("wifi", "Wi‑Fi", active.host, accent)
+    }
+
     private var profileChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassEffectContainer(spacing: 12) {
@@ -142,7 +192,10 @@ struct ComposeView: View {
                             }
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
-                            Text(profile.name)
+                            Label(profile.name,
+                                  systemImage: profile.transport == .bluetooth
+                                      ? "antenna.radiowaves.left.and.right" : "wifi")
+                                .labelStyle(.titleAndIcon)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(isActive ? accent : palette.textPrimary)
                                 .padding(.horizontal, 20)
@@ -232,10 +285,12 @@ struct ComposeView: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Image(systemName: sentPulse ? "checkmark" : "keyboard")
+                    Image(systemName: sentPulse ? "checkmark" : (bluetooth ? "antenna.radiowaves.left.and.right" : "keyboard"))
                         .contentTransition(.symbolEffect(.replace))
                 }
-                Text(sentPulse ? "Sent" : "Type")
+                Text(sentPulse ? "Sent" : (bluetooth ? "Send via Bluetooth" : "Type"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)

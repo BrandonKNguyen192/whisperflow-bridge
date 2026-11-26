@@ -25,10 +25,20 @@ The helper has no login item. Open it when you need it; quit from its menu.
 ## Before the flight (at home)
 
 1. Make sure the Python receiver starts on its own (or start it before you take off).
-2. On the iPhone, scan the pairing QR so the profile has the token.
-3. Open **WhisperBridge Bluetooth** on the Mac and allow Bluetooth.
-4. On the iPhone: Settings → profile → **Transport: Bluetooth (text only)** → **Test**.
-   Accept the pairing prompt on both devices. After this, pairing is remembered.
+2. Open **WhisperBridge Bluetooth** on the Mac and allow Bluetooth. If the menu
+   says "Bluetooth permission needed", click **Open Bluetooth Privacy Settings…**
+   and turn it on.
+3. Menu bar → **Pair iPhone…** shows a QR (the receiver's token from
+   `~/.config/whisperbridge/token` plus `transport=bluetooth`). On the iPhone:
+   Settings → **Scan**. It creates "<Mac> · Bluetooth" and selects it.
+   **Copy link** works too: paste it with "Paste pairing link".
+4. Tap **Test** on the iPhone and accept the pairing prompt on both devices.
+   After this, pairing is remembered.
+
+The menu shows the Bluetooth state, whether an iPhone is connected, whether the
+receiver on port 9877 answers, and the last message. The iPhone shows a blue
+"Bluetooth · Connected to <Mac>" pill whenever a Bluetooth profile is active
+("Wi‑Fi" or "Tailscale" otherwise).
 
 ## On the plane
 
